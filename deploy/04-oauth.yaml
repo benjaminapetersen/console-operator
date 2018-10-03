@@ -1,0 +1,6 @@
+apiVersion: oauth.openshift.io/v1
+kind: OAuthClient
+metadata:
+  name: openshift-web-console # backwards compat, so is not openshift-console like most things
+grantMethod: auto
+respondWithChallenges: false
