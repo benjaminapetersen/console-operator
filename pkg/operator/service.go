@@ -57,7 +57,7 @@ func CreateService(cr *v1alpha1.Console) (*corev1.Service, error) {
 	return svc, nil
 }
 
-func CreateServiceIfNotPresent(cr *v1alpha1.Console) (*corev1.Service, error) {
+func ApplyService(cr *v1alpha1.Console) (*corev1.Service, error) {
 	svc := newConsoleService(cr)
 	err := sdk.Get(svc)
 

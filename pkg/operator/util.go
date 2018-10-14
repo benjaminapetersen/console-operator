@@ -38,6 +38,8 @@ func labelsForConsole() map[string]string {
 	return allLabels
 }
 
+// TODO: OwnerRef is a metadata field.
+// clean up by putting that here.
 func sharedMeta() metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		// TODO: will we always have one console?

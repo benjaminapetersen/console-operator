@@ -183,7 +183,7 @@ func CreateConsoleDeployment(cr *v1alpha1.Console) (*appsv1.Deployment, error) {
 	return d, nil
 }
 
-func CreateConsoleDeploymentIfNotPresent(cr *v1alpha1.Console) (*appsv1.Deployment, error) {
+func ApplyDeployment(cr *v1alpha1.Console) (*appsv1.Deployment, error) {
 	d := newConsoleDeployment(cr)
 	err := sdk.Get(d)
 
