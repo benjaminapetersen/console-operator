@@ -38,6 +38,7 @@ import (
 //   sync route.host between route, oauthclient.redirectURIs & configmap.baseAddress
 func ReconcileConsole(cr *v1alpha1.Console) error {
 	// TODO: aggregate this, just like DeleteAllResources()
+
 	if _, err := ApplyService(cr); err != nil {
 		return err
 	}
