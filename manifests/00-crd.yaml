@@ -21,4 +21,11 @@ spec:
   # soon will be cluster scoped
   scope: Namespaced
   version: v1alpha1
+  # TODO: will need to regen code after moving this
+  # because all my clients will no longer work.
+  # - change magic comments from "namespaced" to "not namespaced"
+  # go find // +genclient on other cluster scoped resources like
+  # the oauthclient:
+  #  // +genclient
+  #  // +genclient:nonNamespaced
 
