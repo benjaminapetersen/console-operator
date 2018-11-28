@@ -1,6 +1,13 @@
+# NOTE:
+# - soon we will not need this at all...
+#
+#
 # The console-operator will create a console automatically on startup if one does not exist.
 # This file is an example of a console resource.
 # You may edit this file and `oc apply -f cr.yaml` to make changes to the console.
+# TODO:
+# console.config.openshift.io (?) -> look @ Adam K's build  in
+# openshift controller manager repo, or talk to Adam K/Ben Parees
 apiVersion: "console.openshift.io/v1alpha1"
 kind: "Console"
 metadata:
@@ -24,3 +31,26 @@ spec:
   version: 4.0.0
   # going away
   value: "panda-bears-are-awesome-and-this-should-be-a-console-instead-woot"
+
+
+# TODO:
+# routes secrets/configmaps have to be in
+#  namespace: openshift-config
+# any secrets/configmaps created by machines/operators
+# need to be in
+#  namespace: openshift-config-managed
+
+# TODO:
+# need RBAC access to read secrets/configmaps from
+# the namespaces: openshift-config, openshift-config-managed
+# BUT we should choose a single known secret name & configmap name
+# with many keys/values on each
+# we could pre-emptively create it to ensure its obvious that it is
+# ours....
+
+# TODO:
+# will eventually need this put on the CR as expected
+# tho this has to be here regardless of custom host for
+# the api or anyone else to know where we live, if they need the value.
+# status
+#   publicHostname: foo

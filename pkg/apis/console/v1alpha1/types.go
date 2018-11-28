@@ -6,6 +6,15 @@ import (
 	"github.com/openshift/api/operator/v1alpha1"
 )
 
+
+// TODO: this must move up into openshift/api/config/console
+// and i will have to import it
+// then tag @api-reviewers (jessica, etc)
+// def ensure that ConsoleStatus.Status.PublicHostnames[]
+// order as config - custom routes first, default one last,
+// so that the api server can just take the first & trust its
+// the most important
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
