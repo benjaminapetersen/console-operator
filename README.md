@@ -144,7 +144,7 @@ IMAGE=docker.io/openshift/origin-console:latest \
     --v 4
 ```
 
-### Deploy an alternative image 
+### Deploy an Alternative Image 
 
 To build a new container image and then deploy it do the following:
 
@@ -170,7 +170,7 @@ oc create -f ./examples/05-operator-alt-image.yaml
 
 The console operator is installed by default and will automatically maintain a console.
 
-## Running against a < 4.0.0 Cluster (min 3.11 Recommended)
+## Running Against a < 4.0.0 Cluster (min 3.11 Recommended)
 
 
 If using oc cluster up on a < 4.0.0 cluster you will need the `--public-hostname` flag 
@@ -217,8 +217,15 @@ oc whoami --loglevel=100
 # likely output will be $HOME/.kube/config 
 ``` 
 
+## Updating Vendored Dependencies
 
+```bash
+# DO: 
+make update-deps
+# DONT:
+glide update
 
+```
 
 
 
