@@ -2,9 +2,6 @@ package starter
 
 import (
 	"fmt"
-	"github.com/openshift/console-operator/pkg/controller"
-	"github.com/openshift/library-go/pkg/operator/status"
-	"k8s.io/client-go/dynamic"
 	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,8 +10,13 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
-	authclient "github.com/openshift/client-go/oauth/clientset/versioned"
+	operatorv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/console-operator/pkg/controller"
+	"github.com/openshift/library-go/pkg/operator/status"
+
 	// clients
+	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	authclient "github.com/openshift/client-go/oauth/clientset/versioned"
 	routesclient "github.com/openshift/client-go/route/clientset/versioned"
 	"github.com/openshift/console-operator/pkg/generated/clientset/versioned"
 	// informers
@@ -22,14 +24,12 @@ import (
 	routesinformers "github.com/openshift/client-go/route/informers/externalversions"
 	"github.com/openshift/console-operator/pkg/generated/informers/externalversions"
 
-	operatorv1alpha1 "github.com/openshift/api/operator/v1alpha1"
 	"github.com/openshift/console-operator/pkg/console/operator"
 )
 
 func RunOperator(clientConfig *rest.Config, stopCh <-chan struct{}) error {
-	// TODO: reenable this after upgradeing library-go
-	// only for the ClusterStatus, everything else has a specific client
-	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	// for the OperatorStatus
+	configClient, err := configclient.NewForConfig(clientConfig)
 	if err != nil {
 		return err
 	}
@@ -125,14 +125,9 @@ func RunOperator(clientConfig *rest.Config, stopCh <-chan struct{}) error {
 
 	go consoleOperator.Run(stopCh)
 
-	// TODO: turn this back on!
-	// for now its just creating noise.... as we need to update library-go for it to work correctly
-	// our version of library-go has the old group
 	clusterOperatorStatus := status.NewClusterOperatorStatusController(
-		controller.TargetNamespace,
 		controller.ResourceName,
-		// no idea why this is dynamic & not a strongly typed client.
-		dynamicClient,
+		configClient.ConfigV1(),
 		&operatorStatusProvider{informers: consoleOperatorInformers},
 	)
 	//// TODO: will have a series of Run() funcs here
@@ -152,11 +147,10 @@ func (p *operatorStatusProvider) Informer() cache.SharedIndexInformer {
 	return p.informers.Console().V1alpha1().Consoles().Informer()
 }
 
-func (p *operatorStatusProvider) CurrentStatus() (operatorv1alpha1.OperatorStatus, error) {
+func (p *operatorStatusProvider) CurrentStatus() (operatorv1.OperatorStatus, error) {
 	instance, err := p.informers.Console().V1alpha1().Consoles().Lister().Consoles(controller.TargetNamespace).Get(controller.ResourceName)
 	if err != nil {
-		return operatorv1alpha1.OperatorStatus{}, err
+		return operatorv1.OperatorStatus{}, err
 	}
-
 	return instance.Status.OperatorStatus, nil
 }
