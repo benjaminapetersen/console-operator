@@ -3,14 +3,13 @@ package operator
 import (
 	// standard lib
 	"fmt"
-	// 3rd party
-	"github.com/blang/semver"
+	"github.com/openshift/library-go/pkg/operator/events"
+
 	"github.com/sirupsen/logrus"
 	// kube
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers/core/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -22,7 +21,6 @@ import (
 	oauthinformersv1 "github.com/openshift/client-go/oauth/informers/externalversions/oauth/v1"
 	routeclientv1 "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
 	"github.com/openshift/console-operator/pkg/controller"
-	"github.com/openshift/library-go/pkg/operator/versioning"
 	// informers
 	routesinformersv1 "github.com/openshift/client-go/route/informers/externalversions/route/v1"
 	consolev1alpha1 "github.com/openshift/console-operator/pkg/apis/console/v1alpha1"
@@ -37,7 +35,6 @@ import (
 	"github.com/openshift/console-operator/pkg/console/subresource/route"
 	"github.com/openshift/console-operator/pkg/console/subresource/secret"
 	"github.com/openshift/console-operator/pkg/console/subresource/service"
-
 )
 
 const (
@@ -63,7 +60,12 @@ func NewConsoleOperator(
 	corev1Client coreclientv1.CoreV1Interface,
 	appsv1Client appsv1.AppsV1Interface,
 	routev1Client routeclientv1.RouteV1Interface,
-	oauthv1Client oauthclientv1.OauthV1Interface) *ConsoleOperator {
+	oauthv1Client oauthclientv1.OauthV1Interface,
+	configMapEventRecorder events.Recorder,
+	deploymentEventRecorder events.Recorder,
+	serviceEventRecorder events.Recorder,
+	secretEventRecorder events.Recorder) *ConsoleOperator {
+
 
 	c := &ConsoleOperator{
 		// operator
@@ -76,6 +78,10 @@ func NewConsoleOperator(
 		// openshift
 		routeClient: routev1Client,
 		oauthClient: oauthv1Client,
+		configMapRecorder: configMapEventRecorder,
+		deploymentRecorder: deploymentEventRecorder,
+		serviceRecorder: serviceEventRecorder,
+		secretRecorder: secretEventRecorder,
 	}
 
 	operatorInformer := coi.Informer()
@@ -137,6 +143,11 @@ type ConsoleOperator struct {
 	// openshift
 	routeClient routeclientv1.RoutesGetter
 	oauthClient oauthclientv1.OAuthClientsGetter
+	// event recorders
+	configMapRecorder events.Recorder
+	deploymentRecorder events.Recorder
+	serviceRecorder events.Recorder
+	secretRecorder events.Recorder
 	// controller
 	controller *controller.Controller
 }
@@ -182,50 +193,15 @@ func (c *ConsoleOperator) sync(_ interface{}) error {
 		return fmt.Errorf("unknown state: %v", operatorConfig.Spec.ManagementState)
 	}
 
-	var currentActualVersion *semver.Version
-
-	// TODO: ca.yaml needs a version, update the v1alpha1.Console to include version field
-	if ca := operatorConfig.Status.Version; ca != nil {
-		ver, err := semver.Parse(ca)
-		if err != nil {
-			utilruntime.HandleError(err)
-		} else {
-			currentActualVersion = &ver
-		}
-	}
-	// not yet using, we target only 4.0.0
-	desiredVersion, err := semver.Parse(operatorConfig.Spec.Version)
-	if err != nil {
-		// TODO report failing status, we may actually attempt to do this in the "normal" error handling
-		return err
-	}
-
-	// this is arbitrary, but we need a placeholder. we will have to handle versioning appropriately at some point
-	v311_to_401 := versioning.NewRangeOrDie("3.11.0", "4.0.1")
-
+	// NOTE: Previously we had a switch statement here to handle versions, desired verison vs current version.
+	// However, the version logic is in flux as the OperatorStatus (which held version) has changed.  For now,
+	// we have one version, v4.0.0, but will add back the switch statement on the version when we have
+	// something stable to work with.
 	outConfig := operatorConfig.DeepCopy()
 	var errs []error
-
-	switch {
-	// v4.0.0 or nil
-	case v311_to_401.BetweenOrEmpty(currentActualVersion):
-		logrus.Println("Sync-4.0.0")
-		outConfig, err = sync_v400(c, outConfig)
-		errs = append(errs, err)
-		if err == nil {
-			outConfig.Status.TaskSummary = "sync-4.0.0"
-			// Upgrading to operatorsv1, this VersionAvailability goes away. compare:
-			// - https://github.com/openshift/api/blob/master/operator/v1/types.go
-			// - https://github.com/openshift/api/blob/master/operator/v1alpha1/types.go (prev)
-			// assuming all of the availability goes to the OperatorStatus object.
-			outConfig.Status.CurrentAvailability = &operatorsv1alpha1.VersionAvailability{
-				Version: desiredVersion.String(),
-			}
-		}
-	default:
-		logrus.Printf("Unrecognized version. Desired %s, Actual %s", desiredVersion, currentActualVersion)
-		outConfig.Status.TaskSummary = "unrecognized"
-	}
+	logrus.Println("Sync-4.0.0")
+	outConfig, err = sync_v400(c, outConfig)
+	errs = append(errs, err)
 
 	// TODO: this should do better apply logic or similar, maybe use SetStatusFromAvailability
 	_, err = c.operatorClient.Update(outConfig)
@@ -265,11 +241,9 @@ func (c *ConsoleOperator) defaultConsole() *consolev1alpha1.Console {
 			Namespace: controller.OpenShiftConsoleNamespace,
 		},
 		Spec: consolev1alpha1.ConsoleSpec{
-			OperatorSpec: operatorsv1alpha1.OperatorSpec{
+			OperatorSpec: operatorv1.OperatorSpec{
 				// by default the console is managed
 				ManagementState: "Managed",
-				// if Verison is not 4.0.0 our reconcile loop will not pick it up
-				Version: "4.0.0",
 			},
 			// one replica is created
 			Count: 1,
