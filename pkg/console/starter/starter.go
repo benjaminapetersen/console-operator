@@ -2,6 +2,7 @@ package starter
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/fields"
 	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,13 +62,10 @@ func RunOperator(clientConfig *rest.Config, stopCh <-chan struct{}) error {
 
 	const resync = 10 * time.Minute
 
-	// NOOP for now
-	// TODO: can perhaps put this back the way it was, but may
-	// need to create a couple different version for
-	// resources w/different names
 	tweakListOptions := func(options *v1.ListOptions) {
-		// options.FieldSelector = fields.OneTermEqualSelector("metadata.name", operator.ResourceName).String()
+		// options.FieldSelector = fields.OneTermEqualSelector("metadata.name", controller.ResourceName).String()
 	}
+
 
 	kubeInformersNamespaced := informers.NewSharedInformerFactoryWithOptions(
 		// takes a client
@@ -77,6 +75,17 @@ func RunOperator(clientConfig *rest.Config, stopCh <-chan struct{}) error {
 		// that take a sharedInformerFactory and return a sharedInformerFactory
 		informers.WithNamespace(controller.TargetNamespace),
 		informers.WithTweakListOptions(tweakListOptions),
+	)
+
+
+	// TODO: do we need separate informers to have unique tweakListOptions for each? maybe.
+	secretInformersNamespaced := informers.NewSharedInformerFactoryWithOptions(
+		kubeClient,
+		resync,
+		informers.WithNamespace(controller.TargetNamespace),
+		informers.WithTweakListOptions(func(options *v1.ListOptions) {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", controller.ResourceName).String()
+		}),
 	)
 
 	consoleOperatorInformers := externalversions.NewSharedInformerFactoryWithOptions(
