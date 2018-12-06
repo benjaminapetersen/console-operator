@@ -230,3 +230,14 @@ func UpdateResourceVersions(dep *appsv1.Deployment, cm *corev1.ConfigMap, sec *c
 	dep.Spec.Template.Annotations[secretResourceVersionAnnotation] = sec.GetResourceVersion()
 	return dep
 }
+
+// TODO: named correctly?
+func ValidateDeployment(co *v1alpha1.Console, dep *appsv1.Deployment) (*appsv1.Deployment, bool) {
+	changed := false
+	if count := &co.Spec.Count; count != dep.Spec.Replicas {
+		dep.Spec.Replicas = count
+		changed = true
+	}
+
+	return dep, changed
+}

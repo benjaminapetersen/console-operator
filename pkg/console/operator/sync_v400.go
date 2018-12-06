@@ -122,8 +122,10 @@ func SyncDeployment(co *ConsoleOperator, consoleConfig *v1alpha1.Console, cm *co
 		return nil, false, getDepErr
 	}
 
+	_, hadIncorrectState := deploymentsub.ValidateDeployment(consoleConfig, existingDeployment)
+
 	// otherwise, we may need to update or force a rollout
-	if deploymentsub.ResourceVersionsChanged(existingDeployment, cm, sec) {
+	if hadIncorrectState || deploymentsub.ResourceVersionsChanged(existingDeployment, cm, sec) {
 		toUpdate := deploymentsub.UpdateResourceVersions(existingDeployment, cm, sec)
 		updatedDeployment, depChanged, updateErr := resourceapply.ApplyDeployment(co.deploymentClient, toUpdate, deploymentGeneration, true)
 		if updateErr != nil {
