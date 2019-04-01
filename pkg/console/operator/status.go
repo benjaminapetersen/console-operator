@@ -180,14 +180,9 @@ func (c *consoleOperator) ConditionNotAvailable(operatorConfig *operatorsv1.Cons
 // we do know we are progressing because we are trying to change something about the operand
 // we do know we failed to make the update
 func (c *consoleOperator) ConditionResourceSyncFailure(operatorConfig *operatorsv1.Console, message string) *operatorsv1.Console {
-	// message := "The operator failed to update a resource of the operand."
-	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
-		Type:               operatorsv1.OperatorStatusTypeAvailable,
-		Status:             operatorsv1.ConditionUnknown,
-		Reason:             reasonSyncError,
-		Message:            message,
-		LastTransitionTime: metav1.Now(),
-	})
+	// If something failed, we know we tried to make a request.
+	// This means we are attempting to reconcile something.
+	// If we are trying to reconcile something, we know we are progressing.
 	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
 		Type:               operatorsv1.OperatorStatusTypeProgressing,
 		Status:             operatorsv1.ConditionTrue,
@@ -195,6 +190,10 @@ func (c *consoleOperator) ConditionResourceSyncFailure(operatorConfig *operators
 		Message:            message,
 		LastTransitionTime: metav1.Now(),
 	})
+	// If something failed, we are failing... BUT we should have an allowed error budget
+	// TODO:
+	// Its not great to flap on failure. its ok to fail sometimes so long as we resolve it
+	// fairly soon.
 	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
 		Type:               operatorsv1.OperatorStatusTypeFailing,
 		Status:             operatorsv1.ConditionTrue,
@@ -319,3 +318,17 @@ func (c *consoleOperator) ConditionsManagementStateRemoved(operatorConfig *opera
 
 	return operatorConfig
 }
+
+// TODO: this should be don!
+//
+// txn = NewStatusTransaction()
+// defer txn.Done() // yay! ensure this happens before func() returns.
+// txn.Start(operatorConfig.status)
+// txn.Add(someNewThing)  // add to array
+// txn.Add(someNewThing)  // add to array
+// txn.Add(someNewThing)  // add to array
+// txn.Commit() // -> ok, process out all the statuses and then make the request
+// Failing:  if 5 things come in, 4 not fail, 1 fail, we are failing
+// Available: if 5 things come in, 4 available, 1 not, we are not available
+// Progressing: if 5 things come in, 4 are not progresssing, 1 is, we are progressing
+// Upgradable: etc
