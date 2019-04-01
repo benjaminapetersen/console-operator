@@ -318,17 +318,3 @@ func (c *consoleOperator) ConditionsManagementStateRemoved(operatorConfig *opera
 
 	return operatorConfig
 }
-
-// TODO: this should be don!
-//
-// txn = NewStatusTransaction()
-// defer txn.Done() // yay! ensure this happens before func() returns.
-// txn.Start(operatorConfig.status)
-// txn.Add(someNewThing)  // add to array
-// txn.Add(someNewThing)  // add to array
-// txn.Add(someNewThing)  // add to array
-// txn.Commit() // -> ok, process out all the statuses and then make the request
-// Failing:  if 5 things come in, 4 not fail, 1 fail, we are failing
-// Available: if 5 things come in, 4 available, 1 not, we are not available
-// Progressing: if 5 things come in, 4 are not progresssing, 1 is, we are progressing
-// Upgradable: etc
