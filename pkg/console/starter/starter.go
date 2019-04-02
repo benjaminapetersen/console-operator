@@ -6,12 +6,16 @@ import (
 	"time"
 
 	// kube
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 
 	// openshift
+	"github.com/openshift/api/oauth"
+	operatorv1 "github.com/openshift/api/operator"
+
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/console-operator/pkg/api"
 	operatorclient "github.com/openshift/console-operator/pkg/console/operatorclient"
@@ -121,11 +125,11 @@ func RunOperator(ctx *controllercmd.ControllerContext) error {
 	consoleOperator := operator.NewConsoleOperator(
 		// informers
 		operatorConfigInformers.Operator().V1().Consoles(), // OperatorConfig
-		configInformers,                                    // ConsoleConfig
-		kubeInformersNamespaced.Core().V1(),                // Secrets, ConfigMaps, Service
-		kubeInformersNamespaced.Apps().V1().Deployments(),  // Deployments
-		routesInformersNamespaced.Route().V1().Routes(),    // Route
-		oauthInformers.Oauth().V1().OAuthClients(),         // OAuth clients
+		configInformers,                                   // ConsoleConfig
+		kubeInformersNamespaced.Core().V1(),               // Secrets, ConfigMaps, Service
+		kubeInformersNamespaced.Apps().V1().Deployments(), // Deployments
+		routesInformersNamespaced.Route().V1().Routes(),   // Route
+		oauthInformers.Oauth().V1().OAuthClients(),        // OAuth clients
 		// clients
 		operatorConfigClient.OperatorV1(),
 		configClient.ConfigV1(),
@@ -144,12 +148,12 @@ func RunOperator(ctx *controllercmd.ControllerContext) error {
 	clusterOperatorStatus := status.NewClusterOperatorStatusController(
 		"console",
 		[]configv1.ObjectReference{
-			{Group: "operator.openshift.io", Resource: "consoles", Name: api.ConfigResourceName},
-			{Group: "config.openshift.io", Resource: "consoles", Name: api.ConfigResourceName},
-			{Group: "config.openshift.io", Resource: "infrastructures", Name: api.ConfigResourceName},
-			{Group: "oauth.openshift.io", Resource: "oauthclients", Name: api.OAuthClientName},
-			{Resource: "namespaces", Name: api.OpenShiftConsoleOperatorNamespace},
-			{Resource: "namespaces", Name: api.OpenShiftConsoleNamespace},
+			{Group: operatorv1.GroupName, Resource: "consoles", Name: api.ConfigResourceName},
+			{Group: configv1.GroupName, Resource: "consoles", Name: api.ConfigResourceName},
+			{Group: configv1.GroupName, Resource: "infrastructures", Name: api.ConfigResourceName},
+			{Group: oauth.GroupName, Resource: "oauthclients", Name: api.OAuthClientName},
+			{Group: corev1.GroupName, Resource: "namespaces", Name: api.OpenShiftConsoleOperatorNamespace},
+			{Group: corev1.GroupName, Resource: "namespaces", Name: api.OpenShiftConsoleNamespace},
 		},
 		configClient.ConfigV1(),
 		operatorClient,
