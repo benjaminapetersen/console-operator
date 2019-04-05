@@ -3,6 +3,8 @@ package deployment
 import (
 	"testing"
 
+	v1 "github.com/openshift/api/route/v1"
+
 	"github.com/go-test/deep"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -22,10 +24,11 @@ func TestDefaultDeployment(t *testing.T) {
 		gracePeriod  int64 = 30
 	)
 	type args struct {
-		cr  *operatorsv1.Console
-		cm  *corev1.ConfigMap
-		ca  *corev1.ConfigMap
-		sec *corev1.Secret
+		config *operatorsv1.Console
+		cm     *corev1.ConfigMap
+		ca     *corev1.ConfigMap
+		sec    *corev1.Secret
+		rt     *v1.Route
 	}
 
 	consoleOperatorConfig := &operatorsv1.Console{
@@ -46,7 +49,7 @@ func TestDefaultDeployment(t *testing.T) {
 		{
 			name: "Test Default Config Map",
 			args: args{
-				cr: consoleOperatorConfig,
+				config: consoleOperatorConfig,
 				cm: &corev1.ConfigMap{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
@@ -78,6 +81,10 @@ func TestDefaultDeployment(t *testing.T) {
 					StringData: nil,
 					Type:       "",
 				},
+				rt: &v1.Route{
+					TypeMeta:   metav1.TypeMeta{},
+					ObjectMeta: metav1.ObjectMeta{},
+				},
 			},
 			want: &appsv1.Deployment{
 				TypeMeta: metav1.TypeMeta{},
@@ -98,6 +105,7 @@ func TestDefaultDeployment(t *testing.T) {
 						secretResourceVersionAnnotation:             "",
 						serviceCAConfigMapResourceVersionAnnotation: "",
 						consoleImageAnnotation:                      "",
+						routeResourceVersionAnnotation:              "",
 					},
 					OwnerReferences: nil,
 					Initializers:    nil,
@@ -170,7 +178,7 @@ func TestDefaultDeployment(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if diff := deep.Equal(DefaultDeployment(tt.args.cr, tt.args.cm, tt.args.cm, tt.args.sec), tt.want); diff != nil {
+			if diff := deep.Equal(DefaultDeployment(tt.args.config, tt.args.cm, tt.args.cm, tt.args.sec, tt.args.rt), tt.want); diff != nil {
 				t.Error(diff)
 			}
 		})

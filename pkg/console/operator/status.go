@@ -91,7 +91,11 @@ func logConditions(conditions []operatorsv1.OperatorCondition) {
 				buf.WriteString(fmt.Sprintf(" %s", condition.Message))
 			}
 		}
+		// Just make it easier for debugging, extra spaces in logs to find these quickly
+		// and see where we are flapping.
+		logrus.Println("")
 		logrus.Println(buf.String())
+		logrus.Println("")
 	}
 }
 
@@ -129,45 +133,6 @@ func (c *consoleOperator) ConditionFailing(operatorConfig *operatorsv1.Console, 
 func (c *consoleOperator) ConditionNotFailing(operatorConfig *operatorsv1.Console) *operatorsv1.Console {
 	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
 		Type:               operatorsv1.OperatorStatusTypeFailing,
-		Status:             operatorsv1.ConditionFalse,
-		LastTransitionTime: metav1.Now(),
-	})
-
-	return operatorConfig
-}
-
-func (c *consoleOperator) ConditionProgressing(operatorConfig *operatorsv1.Console) *operatorsv1.Console {
-	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
-		Type:               operatorsv1.OperatorStatusTypeProgressing,
-		Status:             operatorsv1.ConditionTrue,
-		LastTransitionTime: metav1.Now(),
-	})
-
-	return operatorConfig
-}
-func (c *consoleOperator) ConditionNotProgressing(operatorConfig *operatorsv1.Console) *operatorsv1.Console {
-	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
-		Type:               operatorsv1.OperatorStatusTypeProgressing,
-		Status:             operatorsv1.ConditionFalse,
-		LastTransitionTime: metav1.Now(),
-	})
-
-	return operatorConfig
-}
-
-func (c *consoleOperator) ConditionAvailable(operatorConfig *operatorsv1.Console) *operatorsv1.Console {
-	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
-		Type:               operatorsv1.OperatorStatusTypeAvailable,
-		Status:             operatorsv1.ConditionTrue,
-		LastTransitionTime: metav1.Now(),
-	})
-
-	return operatorConfig
-}
-
-func (c *consoleOperator) ConditionNotAvailable(operatorConfig *operatorsv1.Console) *operatorsv1.Console {
-	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
-		Type:               operatorsv1.OperatorStatusTypeAvailable,
 		Status:             operatorsv1.ConditionFalse,
 		LastTransitionTime: metav1.Now(),
 	})

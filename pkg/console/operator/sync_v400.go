@@ -53,49 +53,63 @@ func sync_v400(co *consoleOperator, originalOperatorConfig *operatorv1.Console, 
 
 	rt, rtChanged, rtErr := SyncRoute(co, operatorConfig)
 	if rtErr != nil {
-		co.SyncStatus(co.ConditionResourceSyncFailure(operatorConfig, fmt.Sprintf("%v: %s\n", "route", rtErr)))
+		msg := fmt.Sprintf("%v: %s\n", "route", rtErr)
+		fmt.Printf("Failed to sync: %v \n", msg)
+		co.SyncStatus(co.ConditionResourceSyncFailure(operatorConfig, msg))
 		return operatorConfig, consoleConfig, toUpdate, rtErr
 	}
 	toUpdate = toUpdate || rtChanged
 
 	_, svcChanged, svcErr := SyncService(co, recorder, operatorConfig)
 	if svcErr != nil {
-		co.SyncStatus(co.ConditionResourceSyncFailure(operatorConfig, fmt.Sprintf("%q: %v\n", "service", svcErr)))
+		msg := fmt.Sprintf("%q: %v\n", "service", svcErr)
+		fmt.Printf("Failed to sync: %v \n", msg)
+		co.SyncStatus(co.ConditionResourceSyncFailure(operatorConfig, msg))
 		return operatorConfig, consoleConfig, toUpdate, svcErr
 	}
 	toUpdate = toUpdate || svcChanged
 
 	cm, cmChanged, cmErr := SyncConfigMap(co, recorder, operatorConfig, consoleConfig, infrastructureConfig, rt)
 	if cmErr != nil {
-		co.SyncStatus(co.ConditionResourceSyncFailure(operatorConfig, fmt.Sprintf("%q: %v\n", "configmap", cmErr)))
+		msg := fmt.Sprintf("%q: %v\n", "configmap", cmErr)
+		fmt.Printf("Failed to sync: %v \n", msg)
+		co.SyncStatus(co.ConditionResourceSyncFailure(operatorConfig, msg))
 		return operatorConfig, consoleConfig, toUpdate, cmErr
 	}
 	toUpdate = toUpdate || cmChanged
 
 	serviceCAConfigMap, serviceCAConfigMapChanged, serviceCAConfigMapErr := SyncServiceCAConfigMap(co, operatorConfig)
 	if serviceCAConfigMapErr != nil {
-		co.SyncStatus(co.ConditionResourceSyncFailure(operatorConfig, fmt.Sprintf("%q: %v\n", "serviceCAconfigmap", serviceCAConfigMapErr)))
+		msg := fmt.Sprintf("%q: %v\n", "serviceCAconfigmap", serviceCAConfigMapErr)
+		fmt.Printf("Failed to sync: %v \n", msg)
+		co.SyncStatus(co.ConditionResourceSyncFailure(operatorConfig, msg))
 		return operatorConfig, consoleConfig, toUpdate, serviceCAConfigMapErr
 	}
 	toUpdate = toUpdate || serviceCAConfigMapChanged
 
 	sec, secChanged, secErr := SyncSecret(co, recorder, operatorConfig)
 	if secErr != nil {
-		co.SyncStatus(co.ConditionResourceSyncFailure(operatorConfig, fmt.Sprintf("%q: %v\n", "secret", secErr)))
+		msg := fmt.Sprintf("%q: %v\n", "secret", secErr)
+		fmt.Printf("Failed to sync: %v \n", msg)
+		co.SyncStatus(co.ConditionResourceSyncFailure(operatorConfig, msg))
 		return operatorConfig, consoleConfig, toUpdate, secErr
 	}
 	toUpdate = toUpdate || secChanged
 
 	_, oauthChanged, oauthErr := SyncOAuthClient(co, operatorConfig, sec, rt)
 	if oauthErr != nil {
-		co.SyncStatus(co.ConditionResourceSyncFailure(operatorConfig, fmt.Sprintf("%q: %v\n", "oauth", oauthErr)))
+		msg := fmt.Sprintf("%q: %v\n", "oauth", oauthErr)
+		fmt.Printf("Failed to sync: %v \n", msg)
+		co.SyncStatus(co.ConditionResourceSyncFailure(operatorConfig, msg))
 		return operatorConfig, consoleConfig, toUpdate, oauthErr
 	}
 	toUpdate = toUpdate || oauthChanged
 
-	actualDeployment, depChanged, depErr := SyncDeployment(co, recorder, operatorConfig, cm, serviceCAConfigMap, sec)
+	actualDeployment, depChanged, depErr := SyncDeployment(co, recorder, operatorConfig, cm, serviceCAConfigMap, sec, rt)
 	if depErr != nil {
-		co.SyncStatus(co.ConditionResourceSyncFailure(operatorConfig, fmt.Sprintf("%q: %v\n", "deployment", depErr)))
+		msg := fmt.Sprintf("%q: %v\n", "deployment", depErr)
+		fmt.Printf("Failed to sync: %v \n", msg)
+		co.SyncStatus(co.ConditionResourceSyncFailure(operatorConfig, msg))
 		return operatorConfig, consoleConfig, toUpdate, depErr
 	}
 	toUpdate = toUpdate || depChanged
@@ -182,17 +196,25 @@ func SyncConsoleConfig(co *consoleOperator, consoleConfig *configv1.Console, rou
 	return co.consoleConfigClient.UpdateStatus(consoleConfig)
 }
 
-func SyncDeployment(co *consoleOperator, recorder events.Recorder, operatorConfig *operatorv1.Console, cm *corev1.ConfigMap, serviceCAConfigMap *corev1.ConfigMap, sec *corev1.Secret) (*appsv1.Deployment, bool, error) {
+func SyncDeployment(co *consoleOperator, recorder events.Recorder, operatorConfig *operatorv1.Console, cm *corev1.ConfigMap, serviceCAConfigMap *corev1.ConfigMap, sec *corev1.Secret, rt *routev1.Route) (*appsv1.Deployment, bool, error) {
 	logrus.Printf("validating console deployment...")
-	requiredDeployment := deploymentsub.DefaultDeployment(operatorConfig, cm, serviceCAConfigMap, sec)
+	requiredDeployment := deploymentsub.DefaultDeployment(operatorConfig, cm, serviceCAConfigMap, sec, rt)
 	expectedGeneration := getDeploymentGeneration(co)
+	genChanged := operatorConfig.ObjectMeta.Generation != operatorConfig.Status.ObservedGeneration
+
+	if genChanged {
+		logrus.Printf("deployment generation changed from %s to %s \n", operatorConfig.ObjectMeta.Generation, operatorConfig.Status.ObservedGeneration)
+	}
+
+	deploymentsub.LogDeploymentAnnotationChanges(co.deploymentClient, requiredDeployment)
+
 	deployment, deploymentChanged, applyDepErr := resourceapply.ApplyDeployment(
 		co.deploymentClient,
 		recorder,
 		requiredDeployment,
 		expectedGeneration,
 		// redeploy on operatorConfig.spec changes
-		operatorConfig.ObjectMeta.Generation != operatorConfig.Status.ObservedGeneration,
+		genChanged,
 	)
 
 	if applyDepErr != nil {
