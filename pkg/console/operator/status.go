@@ -54,7 +54,7 @@ const (
 	reasonRemoved             = "ManagementStateRemoved"
 	reasonSyncLoopProgressing = "SyncLoopProgressing"
 	reasonNoPodsAvailable     = "NoPodsAvailable"
-	reasonSyncError           = "SyncError"
+	reasonSyncIncomplete      = "ResourceSyncIncomplete"
 	reasonAsExpected          = "AsExpected"
 )
 
@@ -162,27 +162,29 @@ func (c *consoleOperator) ConditionNotFailing(operatorConfig *operatorsv1.Consol
 // we dont know if the operand is available
 // we do know we are progressing because we are trying to change something about the operand
 // we do know we failed to make the update
-func (c *consoleOperator) ConditionResourceSyncFailure(operatorConfig *operatorsv1.Console, message string) *operatorsv1.Console {
+func (c *consoleOperator) ConditionResourceSyncIncomplete(operatorConfig *operatorsv1.Console, message string) *operatorsv1.Console {
 	// message := "The operator failed to update a resource of the operand."
 	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
 		Type:               operatorsv1.OperatorStatusTypeAvailable,
 		Status:             operatorsv1.ConditionUnknown,
-		Reason:             reasonSyncError,
+		Reason:             reasonSyncIncomplete,
 		Message:            message,
 		LastTransitionTime: metav1.Now(),
 	})
 	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
 		Type:               operatorsv1.OperatorStatusTypeProgressing,
 		Status:             operatorsv1.ConditionTrue,
-		Reason:             reasonSyncError,
+		Reason:             reasonSyncIncomplete,
 		Message:            message,
 		LastTransitionTime: metav1.Now(),
 	})
 	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
-		Type:               operatorsv1.OperatorStatusTypeFailing,
-		Status:             operatorsv1.ConditionTrue,
+		Type: operatorsv1.OperatorStatusTypeFailing,
+		// a sync error isn't failing, sync error just means the sync loop could not complete.
+		// at times this is intentional.
+		Status:             operatorsv1.ConditionFalse,
 		Message:            message,
-		Reason:             reasonSyncError,
+		Reason:             reasonSyncIncomplete,
 		LastTransitionTime: metav1.Now(),
 	})
 
