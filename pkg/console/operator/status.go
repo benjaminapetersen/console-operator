@@ -58,9 +58,21 @@ const (
 	reasonAsExpected          = "AsExpected"
 )
 
+// in memory count of failures, no persistent storage across restarts atm
+type FailureBudget struct {
+	// simply increment...
+	Total int
+}
+
+func NewFailureBudget() FailureBudget {
+	return FailureBudget{
+		Total: 0,
+	}
+}
+
 // Lets transition to using this, and get the repetition out of all of the above.
 func (c *consoleOperator) SyncStatus(operatorConfig *operatorsv1.Console) (*operatorsv1.Console, error) {
-	logConditions(operatorConfig.Status.Conditions)
+	c.logConditions(operatorConfig.Status.Conditions)
 	updatedConfig, err := c.operatorConfigClient.UpdateStatus(operatorConfig)
 	if err != nil {
 		errMsg := fmt.Errorf("status update error: %v \n", err)
@@ -75,8 +87,12 @@ func (c *consoleOperator) SyncStatus(operatorConfig *operatorsv1.Console) (*oper
 //   Status.Condition.<Condition>: <Bool> (<Reason>)
 //   Status.Condition.<Condition>: <Bool> (<Reason>) <Message>
 //   Status.Condition.<Condition>: <Bool> <Message>
-func logConditions(conditions []operatorsv1.OperatorCondition) {
+func (c *consoleOperator) logConditions(conditions []operatorsv1.OperatorCondition) {
 	logrus.Println("Operator.Status.Conditions")
+
+	// Testing to see if this is a good idea or not....
+	logrus.Printf("failure budget Total: %v \n", c.failureBudget.Total)
+
 	for _, condition := range conditions {
 		buf := bytes.Buffer{}
 		buf.WriteString(fmt.Sprintf("Status.Condition.%s: %s", condition.Type, condition.Status))
@@ -127,6 +143,8 @@ func (c *consoleOperator) ConditionFailing(operatorConfig *operatorsv1.Console, 
 		LastTransitionTime: metav1.Now(),
 	})
 
+	c.failureBudget.Total++
+
 	return operatorConfig
 }
 
@@ -167,6 +185,7 @@ func (c *consoleOperator) ConditionResourceSyncFailure(operatorConfig *operators
 		Reason:             reasonSyncError,
 		LastTransitionTime: metav1.Now(),
 	})
+	c.failureBudget.Total++
 
 	return operatorConfig
 }

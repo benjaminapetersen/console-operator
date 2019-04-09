@@ -68,7 +68,8 @@ type consoleOperator struct {
 	infrastructureConfigClient configclientv1.InfrastructureInterface
 	versionGetter              status.VersionGetter
 	// recorder
-	recorder events.Recorder
+	recorder      events.Recorder
+	failureBudget FailureBudget
 }
 
 func NewConsoleOperator(
@@ -91,6 +92,7 @@ func NewConsoleOperator(
 	versionGetter status.VersionGetter,
 	// recorder
 	recorder events.Recorder,
+	failureBudget FailureBudget,
 ) operator.Runner {
 	c := &consoleOperator{
 		// configs
@@ -108,7 +110,8 @@ func NewConsoleOperator(
 		oauthClient:   oauthv1Client,
 		versionGetter: versionGetter,
 		// recorder
-		recorder: recorder,
+		recorder:      recorder,
+		failureBudget: failureBudget,
 	}
 
 	secretsInformer := coreV1.Secrets()
@@ -175,7 +178,7 @@ func (c *consoleOperator) Sync(obj metav1.Object) error {
 
 	// all configs needed to do a sync
 	if err := c.handleSync(operatorConfig, consoleConfig, infrastructureConfig); err != nil {
-		c.SyncStatus(c.ConditionFailing(operatorConfig, "SyncLoopError", "Operator sync loop failed to completele."))
+		c.SyncStatus(c.ConditionFailing(operatorConfig, "SyncLoopError", "Operator sync loop failed to complete."))
 		return err
 	}
 	c.SyncStatus(c.ConditionNotFailing(operatorConfig))
