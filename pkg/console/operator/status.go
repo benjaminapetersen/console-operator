@@ -185,7 +185,6 @@ func (c *consoleOperator) ConditionResourceSyncFailure(operatorConfig *operators
 		Reason:             reasonSyncError,
 		LastTransitionTime: metav1.Now(),
 	})
-	c.failureBudget.Total++
 
 	return operatorConfig
 }
