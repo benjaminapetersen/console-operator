@@ -181,11 +181,13 @@ func LogDeploymentAnnotationChanges(client appsclientv1.DeploymentsGetter, updat
 	for _, annot := range resourceAnnotations {
 		if existing.ObjectMeta.Annotations[annot] != updated.ObjectMeta.Annotations[annot] {
 			changed = true
-			logrus.Printf("deployment resource version [%v] has changed from: %v to %v \n", annot, existing.ObjectMeta.Annotations[annot], updated.ObjectMeta.Annotations[annot])
+			logrus.Printf("deployment annotation[%v] has changed from: %v to %v \n", annot, existing.ObjectMeta.Annotations[annot], updated.ObjectMeta.Annotations[annot])
 		}
 	}
 	if !changed {
 		logrus.Println("deployment resource versions have not changed")
+	} else {
+		fmt.Println("redeploying console deployment")
 	}
 
 }
