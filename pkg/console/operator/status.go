@@ -215,12 +215,12 @@ func (c *consoleOperator) ConditionDeploymentAvailable(operatorConfig *operators
 	return operatorConfig
 }
 
-func (c *consoleOperator) ConditionDeploymentNotAvailable(operatorConfig *operatorsv1.Console) *operatorsv1.Console {
+func (c *consoleOperator) ConditionDeploymentNotAvailable(operatorConfig *operatorsv1.Console, message string) *operatorsv1.Console {
 	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
 		Type:               operatorsv1.OperatorStatusTypeAvailable,
 		Status:             operatorsv1.ConditionFalse,
 		Reason:             reasonNoPodsAvailable,
-		Message:            "No pods available for console deployment.",
+		Message:            message,
 		LastTransitionTime: metav1.Now(),
 	})
 

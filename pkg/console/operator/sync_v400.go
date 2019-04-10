@@ -140,13 +140,16 @@ func sync_v400(co *consoleOperator, originalOperatorConfig *operatorv1.Console, 
 		}
 	}
 
+	// TODO: these are really not tied, so an if/else is not appropriate.
+	// we are just only handling a single Condition Reason/Message at a time.
+	//
 	// the operand is available if all resources are:
 	// - present
 	// - if we have at least one ready replica
 	// - route is admitted
 	// available is currently defined as "met the users intent"
 	if !deploymentsub.IsReady(actualDeployment) {
-		co.ConditionDeploymentNotAvailable(operatorConfig)
+		co.ConditionDeploymentNotAvailable(operatorConfig, fmt.Sprintf("%v pods available for console deployment.", actualDeployment.Status.ReadyReplicas))
 	} else if !routesub.IsAdmitted(rt) {
 		co.SetStatusCondition(
 			operatorConfig,
