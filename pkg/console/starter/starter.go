@@ -117,7 +117,7 @@ func RunOperator(ctx *controllercmd.ControllerContext) error {
 
 	versionGetter := status.NewVersionGetter()
 
-	failureBudget := operator.NewFailureBudget()
+	failureBudget := operator.NewErrorBudget()
 
 	// TODO: rearrange these into informer,client pairs, NOT separated.
 	consoleOperator := operator.NewConsoleOperator(

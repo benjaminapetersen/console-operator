@@ -58,14 +58,16 @@ const (
 	reasonAsExpected          = "AsExpected"
 )
 
-// in memory count of failures, no persistent storage across restarts atm
-type FailureBudget struct {
-	// simply increment...
+// TODO: we should have the concept of an error budget, track various types of failures,
+// and not actually hard fail (OperatorStatusTypeFailing:True) until we exceed a reasonable
+// budget.  The loop/retry mechanism should allow us to flutter a bit & fix ourselves.
+type ErrorBudget struct {
+	// Experimental: just a counter atm.  Need to consider what would be valuable to track.
 	Total int
 }
 
-func NewFailureBudget() FailureBudget {
-	return FailureBudget{
+func NewErrorBudget() ErrorBudget {
+	return ErrorBudget{
 		Total: 0,
 	}
 }
@@ -91,7 +93,7 @@ func (c *consoleOperator) logConditions(conditions []operatorsv1.OperatorConditi
 	logrus.Println("Operator.Status.Conditions")
 
 	// Testing to see if this is a good idea or not....
-	logrus.Printf("failure budget Total: %v \n", c.failureBudget.Total)
+	logrus.Printf("error budget total: %v \n", c.errorBudget.Total)
 
 	for _, condition := range conditions {
 		buf := bytes.Buffer{}
@@ -143,7 +145,7 @@ func (c *consoleOperator) ConditionFailing(operatorConfig *operatorsv1.Console, 
 		LastTransitionTime: metav1.Now(),
 	})
 
-	c.failureBudget.Total++
+	c.errorBudget.Total++
 
 	return operatorConfig
 }
