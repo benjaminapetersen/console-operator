@@ -159,18 +159,20 @@ func (c *consoleOperator) ConditionNotFailing(operatorConfig *operatorsv1.Consol
 }
 
 // When a sync failure happens,
-// we dont know if the operand is available
+// we dont know if the operand is available, so it is best not to set it.
+//  on install, an incomplete sync will mean the operator is unavailable.
+//  however, on a later sync when a change is encountered, this is not true.
 // we do know we are progressing because we are trying to change something about the operand
 // we do know we failed to make the update
 func (c *consoleOperator) ConditionResourceSyncIncomplete(operatorConfig *operatorsv1.Console, message string) *operatorsv1.Console {
 	// message := "The operator failed to update a resource of the operand."
-	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
-		Type:               operatorsv1.OperatorStatusTypeAvailable,
-		Status:             operatorsv1.ConditionUnknown,
-		Reason:             reasonSyncIncomplete,
-		Message:            message,
-		LastTransitionTime: metav1.Now(),
-	})
+	//v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
+	//	Type:               operatorsv1.OperatorStatusTypeAvailable,
+	//	Status:             operatorsv1.ConditionUnknown,
+	//	Reason:             reasonSyncIncomplete,
+	//	Message:            message,
+	//	LastTransitionTime: metav1.Now(),
+	//})
 	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
 		Type:               operatorsv1.OperatorStatusTypeProgressing,
 		Status:             operatorsv1.ConditionTrue,
