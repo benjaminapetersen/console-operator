@@ -317,7 +317,7 @@ func IsReady(deployment *appsv1.Deployment) bool {
 	if avail {
 		logrus.Printf("Deployment is available, ready replicas: %v \n", avail)
 	} else {
-		fmt.Print("Deployment is not available, ready replicas: %v \n", avail)
+		fmt.Printf("Deployment is not available, ready replicas: %v \n", avail)
 	}
 	return avail
 }
