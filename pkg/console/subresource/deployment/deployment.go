@@ -315,9 +315,9 @@ func livenessProbe() *corev1.Probe {
 func IsReady(deployment *appsv1.Deployment) bool {
 	avail := deployment.Status.ReadyReplicas >= 1
 	if avail {
-		logrus.Printf("Deployment is available, ready replicas: %v \n", avail)
+		logrus.Printf("Deployment is available, ready replicas: %v \n", deployment.Status.ReadyReplicas)
 	} else {
-		fmt.Printf("Deployment is not available, ready replicas: %v \n", avail)
+		fmt.Printf("Deployment is not available, ready replicas: %v \n", deployment.Status.ReadyReplicas)
 	}
 	return avail
 }
