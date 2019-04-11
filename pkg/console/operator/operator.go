@@ -48,8 +48,7 @@ import (
 )
 
 const (
-	controllerName           = "Console"
-	workloadFailingCondition = "WorkloadFailing"
+	controllerName = "Console"
 )
 
 var CreateDefaultConsoleFlag bool
@@ -68,8 +67,7 @@ type consoleOperator struct {
 	infrastructureConfigClient configclientv1.InfrastructureInterface
 	versionGetter              status.VersionGetter
 	// recorder
-	recorder    events.Recorder
-	errorBudget ErrorBudget
+	recorder events.Recorder
 }
 
 func NewConsoleOperator(
@@ -92,7 +90,6 @@ func NewConsoleOperator(
 	versionGetter status.VersionGetter,
 	// recorder
 	recorder events.Recorder,
-	errorBudget ErrorBudget,
 ) operator.Runner {
 	c := &consoleOperator{
 		// configs
@@ -110,8 +107,7 @@ func NewConsoleOperator(
 		oauthClient:   oauthv1Client,
 		versionGetter: versionGetter,
 		// recorder
-		recorder:    recorder,
-		errorBudget: errorBudget,
+		recorder: recorder,
 	}
 
 	secretsInformer := coreV1.Secrets()
@@ -178,12 +174,8 @@ func (c *consoleOperator) Sync(obj metav1.Object) error {
 
 	// all configs needed to do a sync
 	if err := c.handleSync(operatorConfig, consoleConfig, infrastructureConfig); err != nil {
-		// perhaps only logging here, let the sync loop handle status?
-		// c.SyncStatus(c.ConditionFailing(operatorConfig, "SyncLoopError", "Operator sync loop failed to complete."))
 		return err
 	}
-	// perhaps only logging here, let the sync loop handle status?
-	// c.SyncStatus(c.ConditionNotFailing(operatorConfig))
 	return nil
 }
 

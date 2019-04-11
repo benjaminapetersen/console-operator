@@ -50,12 +50,16 @@ import (
 //
 
 const (
-	reasonUnmanaged           = "ManagementStateUnmanaged"
-	reasonRemoved             = "ManagementStateRemoved"
+	// standard reasons used by other operators for consistency
+	reasonAsExpected      = "AsExpected"
+	reasonWorkloadFailing = "WorkloadFailing"
+	// the simplest resolutions would likely come from management state
+	reasonUnmanaged = "ManagementStateUnmanaged"
+	reasonRemoved   = "ManagementStateRemoved"
+	// these are most meaningful and specific to our operator
 	reasonSyncLoopProgressing = "SyncLoopProgressing"
 	reasonNoPodsAvailable     = "NoPodsAvailable"
 	reasonSyncIncomplete      = "ResourceSyncIncomplete"
-	reasonAsExpected          = "AsExpected"
 )
 
 // TODO: we should have the concept of an error budget, track various types of failures,

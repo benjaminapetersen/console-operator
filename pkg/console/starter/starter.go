@@ -117,17 +117,15 @@ func RunOperator(ctx *controllercmd.ControllerContext) error {
 
 	versionGetter := status.NewVersionGetter()
 
-	failureBudget := operator.NewErrorBudget()
-
 	// TODO: rearrange these into informer,client pairs, NOT separated.
 	consoleOperator := operator.NewConsoleOperator(
 		// informers
 		operatorConfigInformers.Operator().V1().Consoles(), // OperatorConfig
-		configInformers,                                    // ConsoleConfig
-		kubeInformersNamespaced.Core().V1(),                // Secrets, ConfigMaps, Service
-		kubeInformersNamespaced.Apps().V1().Deployments(),  // Deployments
-		routesInformersNamespaced.Route().V1().Routes(),    // Route
-		oauthInformers.Oauth().V1().OAuthClients(),         // OAuth clients
+		configInformers,                                   // ConsoleConfig
+		kubeInformersNamespaced.Core().V1(),               // Secrets, ConfigMaps, Service
+		kubeInformersNamespaced.Apps().V1().Deployments(), // Deployments
+		routesInformersNamespaced.Route().V1().Routes(),   // Route
+		oauthInformers.Oauth().V1().OAuthClients(),        // OAuth clients
 		// clients
 		operatorConfigClient.OperatorV1(),
 		configClient.ConfigV1(),
@@ -138,7 +136,6 @@ func RunOperator(ctx *controllercmd.ControllerContext) error {
 		oauthClient.OauthV1(),
 		versionGetter,
 		recorder,
-		failureBudget,
 	)
 
 	versionRecorder := status.NewVersionGetter()
