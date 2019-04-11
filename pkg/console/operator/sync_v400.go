@@ -60,7 +60,7 @@ func sync_v400(co *consoleOperator, originalOperatorConfig *operatorv1.Console, 
 	}
 	toUpdate = toUpdate || rtChanged
 
-	_, svcChanged, svcErr := SyncService(co, recorder, operatorConfig)
+	svc, svcChanged, svcErr := SyncService(co, recorder, operatorConfig)
 	if svcErr != nil {
 		msg := fmt.Sprintf("%q: %v\n", "service", svcErr)
 		fmt.Printf("incomplete sync: %v \n", msg)
@@ -96,7 +96,7 @@ func sync_v400(co *consoleOperator, originalOperatorConfig *operatorv1.Console, 
 	}
 	toUpdate = toUpdate || secChanged
 
-	_, oauthChanged, oauthErr := SyncOAuthClient(co, operatorConfig, sec, rt)
+	oauthClient, oauthChanged, oauthErr := SyncOAuthClient(co, operatorConfig, sec, rt)
 	if oauthErr != nil {
 		msg := fmt.Sprintf("%q: %v\n", "oauth", oauthErr)
 		fmt.Printf("incomplete sync: %v \n", msg)
@@ -140,11 +140,6 @@ func sync_v400(co *consoleOperator, originalOperatorConfig *operatorv1.Console, 
 		}
 	}
 
-	logrus.Println("Availability Check")
-	logrus.Printf("deployment ready: %v \n", deploymentsub.IsReady(actualDeployment))
-	logrus.Printf("pods: %v \n", actualDeployment.Status.ReadyReplicas)
-	logrus.Printf("route admitted: %v \n", routesub.IsAdmitted(rt))
-
 	// TODO: these are really not tied, so an if/else is not appropriate.
 	// we are just only handling a single Condition Reason/Message at a time.
 	//
@@ -185,13 +180,28 @@ func sync_v400(co *consoleOperator, originalOperatorConfig *operatorv1.Console, 
 	}
 
 	defer func() {
-		logrus.Printf("sync loop 4.0.0 complete:")
-		//logrus.Printf("\t service changed: %v", svcChanged)
-		//logrus.Printf("\t route changed: %v", rtChanged)
-		//logrus.Printf("\t configMap changed: %v", cmChanged)
-		//logrus.Printf("\t secret changed: %v", secChanged)
-		//logrus.Printf("\t oauth changed: %v", oauthChanged)
-		//logrus.Printf("\t deployment changed: %v", depChanged)
+		logrus.Printf("sync loop 4.0.0 complete")
+		if svcChanged {
+			logrus.Printf("\t service changed: %v", svc.GetResourceVersion())
+		}
+		if rtChanged {
+			logrus.Printf("\t route changed: %v", rt.GetResourceVersion())
+		}
+		if cmChanged {
+			logrus.Printf("\t configMap changed: %v", cm.GetResourceVersion())
+		}
+		if serviceCAConfigMapChanged {
+			logrus.Printf("\t service-ca configMap changed: %v", serviceCAConfigMap.GetResourceVersion())
+		}
+		if secChanged {
+			logrus.Printf("\t secret changed: %v", sec.GetResourceVersion())
+		}
+		if oauthChanged {
+			logrus.Printf("\t oauth changed: %v", oauthClient.GetResourceVersion())
+		}
+		if depChanged {
+			logrus.Printf("\t deployment changed: %v", actualDeployment.GetResourceVersion())
+		}
 	}()
 
 	return operatorConfig, consoleConfig, toUpdate, nil
