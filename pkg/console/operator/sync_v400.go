@@ -149,14 +149,17 @@ func sync_v400(co *consoleOperator, originalOperatorConfig *operatorv1.Console, 
 	// - route is admitted
 	// available is currently defined as "met the users intent"
 	if !deploymentsub.IsReady(actualDeployment) {
-		co.ConditionDeploymentNotAvailable(operatorConfig, fmt.Sprintf("%v pods available for console deployment.", actualDeployment.Status.ReadyReplicas))
+		msg := fmt.Sprintf("%v pods available for console deployment", actualDeployment.Status.ReadyReplicas)
+		logrus.Println(msg)
+		co.ConditionDeploymentNotAvailable(operatorConfig, msg)
 	} else if !routesub.IsAdmitted(rt) {
+		fmt.Println("console route is not admitted")
 		co.SetStatusCondition(
 			operatorConfig,
 			operatorv1.OperatorStatusTypeAvailable,
 			operatorv1.ConditionFalse,
 			"RouteNotAdmitted",
-			"Console route is not admitted",
+			"console route is not admitted",
 		)
 	} else {
 		co.ConditionDeploymentAvailable(operatorConfig)
@@ -178,12 +181,12 @@ func sync_v400(co *consoleOperator, originalOperatorConfig *operatorv1.Console, 
 
 	defer func() {
 		logrus.Printf("sync loop 4.0.0 complete:")
-		logrus.Printf("\t service changed: %v", svcChanged)
-		logrus.Printf("\t route changed: %v", rtChanged)
-		logrus.Printf("\t configMap changed: %v", cmChanged)
-		logrus.Printf("\t secret changed: %v", secChanged)
-		logrus.Printf("\t oauth changed: %v", oauthChanged)
-		logrus.Printf("\t deployment changed: %v", depChanged)
+		//logrus.Printf("\t service changed: %v", svcChanged)
+		//logrus.Printf("\t route changed: %v", rtChanged)
+		//logrus.Printf("\t configMap changed: %v", cmChanged)
+		//logrus.Printf("\t secret changed: %v", secChanged)
+		//logrus.Printf("\t oauth changed: %v", oauthChanged)
+		//logrus.Printf("\t deployment changed: %v", depChanged)
 	}()
 
 	return operatorConfig, consoleConfig, toUpdate, nil
@@ -194,13 +197,16 @@ func SyncConsoleConfig(co *consoleOperator, consoleConfig *configv1.Console, rou
 	if err != nil {
 		return nil, err
 	}
-	logrus.Printf("Updating console.config.openshift.io with hostname: %v \n", host)
-	consoleConfig.Status.ConsoleURL = util.HTTPS(host)
+	httpsHost := util.HTTPS(host)
+	if consoleConfig.Status.ConsoleURL != httpsHost {
+		logrus.Printf("Updating console.config.openshift.io with hostname: %v \n", host)
+	}
+	consoleConfig.Status.ConsoleURL = httpsHost
 	return co.consoleConfigClient.UpdateStatus(consoleConfig)
 }
 
 func SyncDeployment(co *consoleOperator, recorder events.Recorder, operatorConfig *operatorv1.Console, cm *corev1.ConfigMap, serviceCAConfigMap *corev1.ConfigMap, sec *corev1.Secret, rt *routev1.Route) (*appsv1.Deployment, bool, error) {
-	logrus.Printf("validating console deployment...")
+	// logrus.Printf("validating console deployment...")
 	requiredDeployment := deploymentsub.DefaultDeployment(operatorConfig, cm, serviceCAConfigMap, sec, rt)
 	expectedGeneration := getDeploymentGeneration(co)
 	genChanged := operatorConfig.ObjectMeta.Generation != operatorConfig.Status.ObservedGeneration
@@ -224,14 +230,14 @@ func SyncDeployment(co *consoleOperator, recorder events.Recorder, operatorConfi
 		logrus.Errorf("%q: %v \n", "deployment", applyDepErr)
 		return nil, false, applyDepErr
 	}
-	logrus.Println("deployment exists and is in the correct state")
+	//logrus.Println("deployment exists and is in the correct state")
 	return deployment, deploymentChanged, nil
 }
 
 // applies changes to the oauthclient
 // should not be called until route & secret dependencies are verified
 func SyncOAuthClient(co *consoleOperator, operatorConfig *operatorv1.Console, sec *corev1.Secret, rt *routev1.Route) (*oauthv1.OAuthClient, bool, error) {
-	logrus.Printf("validating oauthclient...")
+	//logrus.Printf("validating oauthclient...")
 	host, err := routesub.GetCanonicalHost(rt)
 	if err != nil {
 		return nil, false, err
@@ -249,12 +255,12 @@ func SyncOAuthClient(co *consoleOperator, operatorConfig *operatorv1.Console, se
 		logrus.Errorf("%q: %v \n", "oauth", oauthErr)
 		return nil, false, oauthErr
 	}
-	logrus.Println("oauthclient exists and is in the correct state")
+	//logrus.Println("oauthclient exists and is in the correct state")
 	return oauthClient, oauthChanged, nil
 }
 
 func SyncSecret(co *consoleOperator, recorder events.Recorder, operatorConfig *operatorv1.Console) (*corev1.Secret, bool, error) {
-	logrus.Printf("validating oauth secret...")
+	//logrus.Printf("validating oauth secret...")
 	secret, err := co.secretsClient.Secrets(api.TargetNamespace).Get(secretsub.Stub().Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) || secretsub.GetSecretString(secret) == "" {
 		return resourceapply.ApplySecret(co.secretsClient, recorder, secretsub.DefaultSecret(operatorConfig, crypto.Random256BitsString()))
@@ -264,7 +270,7 @@ func SyncSecret(co *consoleOperator, recorder events.Recorder, operatorConfig *o
 		logrus.Errorf("%q: %v \n", "secret", err)
 		return nil, false, err
 	}
-	logrus.Println("secret exists and is in the correct state")
+	//logrus.Println("secret exists and is in the correct state")
 	return secret, false, nil
 }
 
@@ -272,7 +278,7 @@ func SyncSecret(co *consoleOperator, recorder events.Recorder, operatorConfig *o
 // by the time we get to the configmap, we can assume the route exits & is configured properly
 // therefore no additional error handling is needed here.
 func SyncConfigMap(co *consoleOperator, recorder events.Recorder, operatorConfig *operatorv1.Console, consoleConfig *configv1.Console, infrastructureConfig *configv1.Infrastructure, rt *routev1.Route) (*corev1.ConfigMap, bool, error) {
-	logrus.Printf("validating console configmap...")
+	//logrus.Printf("validating console configmap...")
 
 	defaultConfigmap, _, err := configmapsub.DefaultConfigMap(operatorConfig, consoleConfig, infrastructureConfig, rt)
 	if err != nil {
@@ -285,13 +291,13 @@ func SyncConfigMap(co *consoleOperator, recorder events.Recorder, operatorConfig
 		return nil, false, cmErr
 	}
 
-	logrus.Println("configmap exists and is in the correct state")
+	//logrus.Println("configmap exists and is in the correct state")
 	return cm, cmChanged, cmErr
 }
 
 // apply service-ca configmap
 func SyncServiceCAConfigMap(co *consoleOperator, operatorConfig *operatorv1.Console) (*corev1.ConfigMap, bool, error) {
-	logrus.Printf("validating service-ca configmap...")
+	//logrus.Printf("validating service-ca configmap...")
 	required := configmapsub.DefaultServiceCAConfigMap(operatorConfig)
 	// we can't use `resourceapply.ApplyConfigMap` since it compares data, and the service serving cert operator injects the data
 	existing, err := co.configMapClient.ConfigMaps(required.Namespace).Get(required.Name, metav1.GetOptions{})
@@ -322,19 +328,20 @@ func SyncServiceCAConfigMap(co *consoleOperator, operatorConfig *operatorv1.Cons
 	} else {
 		logrus.Errorf("%q: %v \n", "service-ca configmap", err)
 	}
+	// logrus.Println("service-ca configmap exists and is in the correct state")
 	return actual, true, err
 }
 
 // apply service
 // there is nothing special about our service, so no additional error handling is needed here.
 func SyncService(co *consoleOperator, recorder events.Recorder, operatorConfig *operatorv1.Console) (*corev1.Service, bool, error) {
-	logrus.Printf("validating console service...")
+	//logrus.Printf("validating console service...")
 	svc, svcChanged, svcErr := resourceapply.ApplyService(co.serviceClient, recorder, servicesub.DefaultService(operatorConfig))
 	if svcErr != nil {
 		logrus.Errorf("%q: %v \n", "service", svcErr)
 		return nil, false, svcErr
 	}
-	logrus.Println("service exists and is in the correct state")
+	//logrus.Println("service exists and is in the correct state")
 	return svc, svcChanged, svcErr
 }
 
@@ -344,7 +351,7 @@ func SyncService(co *consoleOperator, recorder events.Recorder, operatorConfig *
 //   logic will have to be sound.
 // - update to ApplyRoute() once the logic is settled
 func SyncRoute(co *consoleOperator, operatorConfig *operatorv1.Console) (*routev1.Route, bool, error) {
-	logrus.Printf("validating console route...")
+	//logrus.Printf("validating console route...")
 	rt, rtIsNew, rtErr := routesub.GetOrCreate(co.routeClient, routesub.DefaultRoute(operatorConfig))
 	// rt, rtChanged, rtErr := routesub.ApplyRoute(co.routeClient, routesub.DefaultRoute(operatorConfig))
 	if rtErr != nil {
@@ -370,7 +377,7 @@ func SyncRoute(co *consoleOperator, operatorConfig *operatorv1.Console) (*routev
 		return nil, true, errMsg
 	}
 	// only returns the route if we hit the happy path, we cannot make progress w/o the host
-	logrus.Println("route exists and is in the correct state")
+	//logrus.Println("route exists and is in the correct state")
 	return rt, rtIsNew, rtErr
 }
 
