@@ -96,9 +96,6 @@ func (c *consoleOperator) SyncStatus(operatorConfig *operatorsv1.Console) (*oper
 func (c *consoleOperator) logConditions(conditions []operatorsv1.OperatorCondition) {
 	logrus.Println("Operator.Status.Conditions")
 
-	// Testing to see if this is a good idea or not....
-	logrus.Printf("error budget total: %v \n", c.errorBudget.Total)
-
 	for _, condition := range conditions {
 		buf := bytes.Buffer{}
 		buf.WriteString(fmt.Sprintf("Status.Condition.%s: %s", condition.Type, condition.Status))
@@ -145,8 +142,6 @@ func (c *consoleOperator) ConditionFailing(operatorConfig *operatorsv1.Console, 
 		LastTransitionTime: metav1.Now(),
 	})
 
-	c.errorBudget.Total++
-
 	return operatorConfig
 }
 
@@ -167,14 +162,6 @@ func (c *consoleOperator) ConditionNotFailing(operatorConfig *operatorsv1.Consol
 // we do know we are progressing because we are trying to change something about the operand
 // we do know we failed to make the update
 func (c *consoleOperator) ConditionResourceSyncIncomplete(operatorConfig *operatorsv1.Console, message string) *operatorsv1.Console {
-	// message := "The operator failed to update a resource of the operand."
-	//v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
-	//	Type:               operatorsv1.OperatorStatusTypeAvailable,
-	//	Status:             operatorsv1.ConditionUnknown,
-	//	Reason:             reasonSyncIncomplete,
-	//	Message:            message,
-	//	LastTransitionTime: metav1.Now(),
-	//})
 	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
 		Type:               operatorsv1.OperatorStatusTypeProgressing,
 		Status:             operatorsv1.ConditionTrue,
