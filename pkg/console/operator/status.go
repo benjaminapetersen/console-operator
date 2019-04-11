@@ -62,20 +62,6 @@ const (
 	reasonSyncIncomplete      = "ResourceSyncIncomplete"
 )
 
-// TODO: we should have the concept of an error budget, track various types of failures,
-// and not actually hard fail (OperatorStatusTypeFailing:True) until we exceed a reasonable
-// budget.  The loop/retry mechanism should allow us to flutter a bit & fix ourselves.
-type ErrorBudget struct {
-	// Experimental: just a counter atm.  Need to consider what would be valuable to track.
-	Total int
-}
-
-func NewErrorBudget() ErrorBudget {
-	return ErrorBudget{
-		Total: 0,
-	}
-}
-
 // Lets transition to using this, and get the repetition out of all of the above.
 func (c *consoleOperator) SyncStatus(operatorConfig *operatorsv1.Console) (*operatorsv1.Console, error) {
 	c.logConditions(operatorConfig.Status.Conditions)
