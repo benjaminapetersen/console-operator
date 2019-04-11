@@ -109,11 +109,7 @@ func (c *consoleOperator) logConditions(conditions []operatorsv1.OperatorConditi
 				buf.WriteString(fmt.Sprintf(" %s", condition.Message))
 			}
 		}
-		// Just make it easier for debugging, extra spaces in logs to find these quickly
-		// and see where we are flapping.
-		logrus.Println("")
 		logrus.Println(buf.String())
-		logrus.Println("")
 	}
 }
 
