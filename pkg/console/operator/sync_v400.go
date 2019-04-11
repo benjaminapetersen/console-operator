@@ -143,7 +143,7 @@ func sync_v400(co *consoleOperator, originalOperatorConfig *operatorv1.Console, 
 	logrus.Println("Availability Check")
 	logrus.Printf("deployment ready: %v \n", deploymentsub.IsReady(actualDeployment))
 	logrus.Printf("pods: %v \n", actualDeployment.Status.ReadyReplicas)
-	logrus.Printf("route admintted: %v \n", routesub.IsAdmitted(rt))
+	logrus.Printf("route admitted: %v \n", routesub.IsAdmitted(rt))
 
 	// TODO: these are really not tied, so an if/else is not appropriate.
 	// we are just only handling a single Condition Reason/Message at a time.
