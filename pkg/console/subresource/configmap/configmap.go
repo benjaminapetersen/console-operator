@@ -2,10 +2,11 @@ package configmap
 
 import (
 	"fmt"
+
 	"github.com/sirupsen/logrus"
 
 	yaml2 "github.com/ghodss/yaml"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -99,8 +100,16 @@ func DefaultConfigMap(operatorConfig *operatorv1.Console, consoleConfig *configv
 
 	configMap.Data[consoleConfigYamlFile] = string(outConfigYaml)
 
-	logrus.Println("generated console config yaml:")
-	logrus.Printf("%s \n", string(outConfigYaml))
+	json, _ := yaml2.YAMLToJSON(outConfigYaml)
+	// this logs with escapes {\"apiVersion\":\"console .... }
+	// not ideal, we want plain ol' json
+	logrus.Printf("generated console config: %v \n", string(json))
+	// this logs [123 34 97 112 105 .....]
+	// not exactly what we are after either
+	logrus.WithFields(logrus.Fields{
+		"generated config": string(json),
+	}).Info("generated config is this")
+
 	util.AddOwnerRef(configMap, util.OwnerRefFrom(operatorConfig))
 
 	return configMap, didMerge, nil
