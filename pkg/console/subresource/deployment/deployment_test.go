@@ -104,7 +104,6 @@ func TestDefaultDeployment(t *testing.T) {
 						secretResourceVersionAnnotation:             "",
 						serviceCAConfigMapResourceVersionAnnotation: "",
 						consoleImageAnnotation:                      "",
-						routeResourceVersionAnnotation:              "",
 					},
 					OwnerReferences: nil,
 					Initializers:    nil,
