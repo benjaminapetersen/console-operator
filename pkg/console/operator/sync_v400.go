@@ -41,7 +41,7 @@ import (
 // The next loop will pick up where they previous left off and move the process forward one step.
 // This ensures the logic is simpler as we do not have to handle coordination between objects within
 // the loop.
-func sync_v400(co *consoleOperator, operatorConfig *operatorv1.Console, consoleConfig *configv1.Console, infrastructureConfig *configv1.Infrastructure) (*operatorv1.Console, *configv1.Console, bool, error) {
+func sync_v400(co *consoleOperator, operatorConfig *operatorv1.Console, consoleConfig *configv1.Console, infrastructureConfig *configv1.Infrastructure) error {
 	logrus.Println("running sync loop 4.0.0")
 	recorder := co.recorder
 
@@ -53,7 +53,7 @@ func sync_v400(co *consoleOperator, operatorConfig *operatorv1.Console, consoleC
 		msg := fmt.Sprintf("%v: %s\n", "route", rtErr)
 		logrus.Printf("incomplete sync: %v \n", msg)
 		co.ConditionResourceSyncProgressing(operatorConfig, msg)
-		return operatorConfig, consoleConfig, toUpdate, rtErr
+		return rtErr
 	}
 	toUpdate = toUpdate || rtChanged
 
@@ -62,7 +62,7 @@ func sync_v400(co *consoleOperator, operatorConfig *operatorv1.Console, consoleC
 		msg := fmt.Sprintf("%q: %v\n", "service", svcErr)
 		logrus.Printf("incomplete sync: %v \n", msg)
 		co.ConditionResourceSyncProgressing(operatorConfig, msg)
-		return operatorConfig, consoleConfig, toUpdate, svcErr
+		return svcErr
 	}
 	toUpdate = toUpdate || svcChanged
 
@@ -71,7 +71,7 @@ func sync_v400(co *consoleOperator, operatorConfig *operatorv1.Console, consoleC
 		msg := fmt.Sprintf("%q: %v\n", "configmap", cmErr)
 		logrus.Printf("incomplete sync: %v \n", msg)
 		co.ConditionResourceSyncProgressing(operatorConfig, msg)
-		return operatorConfig, consoleConfig, toUpdate, cmErr
+		return cmErr
 	}
 	toUpdate = toUpdate || cmChanged
 
@@ -80,7 +80,7 @@ func sync_v400(co *consoleOperator, operatorConfig *operatorv1.Console, consoleC
 		msg := fmt.Sprintf("%q: %v\n", "serviceCAconfigmap", serviceCAConfigMapErr)
 		logrus.Printf("incomplete sync: %v \n", msg)
 		co.ConditionResourceSyncProgressing(operatorConfig, msg)
-		return operatorConfig, consoleConfig, toUpdate, serviceCAConfigMapErr
+		return serviceCAConfigMapErr
 	}
 	toUpdate = toUpdate || serviceCAConfigMapChanged
 
@@ -89,7 +89,7 @@ func sync_v400(co *consoleOperator, operatorConfig *operatorv1.Console, consoleC
 		msg := fmt.Sprintf("%q: %v\n", "secret", secErr)
 		logrus.Printf("incomplete sync: %v \n", msg)
 		co.ConditionResourceSyncProgressing(operatorConfig, msg)
-		return operatorConfig, consoleConfig, toUpdate, secErr
+		return secErr
 	}
 	toUpdate = toUpdate || secChanged
 
@@ -98,7 +98,7 @@ func sync_v400(co *consoleOperator, operatorConfig *operatorv1.Console, consoleC
 		msg := fmt.Sprintf("%q: %v\n", "oauth", oauthErr)
 		logrus.Printf("incomplete sync: %v \n", msg)
 		co.ConditionResourceSyncProgressing(operatorConfig, msg)
-		return operatorConfig, consoleConfig, toUpdate, oauthErr
+		return oauthErr
 	}
 	toUpdate = toUpdate || oauthChanged
 
@@ -107,7 +107,7 @@ func sync_v400(co *consoleOperator, operatorConfig *operatorv1.Console, consoleC
 		msg := fmt.Sprintf("%q: %v\n", "deployment", depErr)
 		logrus.Printf("incomplete sync: %v \n", msg)
 		co.ConditionResourceSyncProgressing(operatorConfig, msg)
-		return operatorConfig, consoleConfig, toUpdate, depErr
+		return depErr
 	}
 	toUpdate = toUpdate || depChanged
 
@@ -162,9 +162,9 @@ func sync_v400(co *consoleOperator, operatorConfig *operatorv1.Console, consoleC
 	// if we survive the gauntlet, we need to update the console config with the
 	// public hostname so that the world can know the console is ready to roll
 	logrus.Println("sync_v400: updating console status")
-	if updatedConfig, err := SyncConsoleConfig(co, consoleConfig, rt); err != nil {
+	if _, err := SyncConsoleConfig(co, consoleConfig, rt); err != nil {
 		logrus.Errorf("could not update console config status: %v \n", err)
-		return operatorConfig, updatedConfig, toUpdate, err
+		return err
 	}
 
 	defer func() {
@@ -192,7 +192,7 @@ func sync_v400(co *consoleOperator, operatorConfig *operatorv1.Console, consoleC
 		}
 	}()
 
-	return operatorConfig, consoleConfig, toUpdate, nil
+	return nil
 }
 
 func SyncConsoleConfig(co *consoleOperator, consoleConfig *configv1.Console, route *routev1.Route) (*configv1.Console, error) {

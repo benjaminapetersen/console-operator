@@ -205,12 +205,8 @@ func (c *consoleOperator) handleSync(operatorConfig *operatorsv1.Console, consol
 
 	// we can default to not failing, and wait to see if sync returns an error
 	c.ConditionNotFailing(operatorConfigCopy)
-	_, _, _, err := sync_v400(c, operatorConfigCopy, consoleConfig, infrastructureConfig)
+	err := sync_v400(c, operatorConfigCopy, consoleConfig, infrastructureConfig)
 	if err != nil {
-		// if we didn't get a custom sync error, then we are failing this does
-		// not yet handle the idea of an error budget.
-		// the operator should attempt to handle the failing condition on its own
-		// for some number of passes of the sync loop before reporting failing.
 		if !customerrors.IsSyncError(err) {
 			c.SyncStatus(c.ConditionResourceSyncFailing(operatorConfigCopy, err.Error()))
 			return err
