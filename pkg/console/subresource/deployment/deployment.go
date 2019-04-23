@@ -35,7 +35,6 @@ const (
 	configMapResourceVersionAnnotation          = "console.openshift.io/console-config-version"
 	serviceCAConfigMapResourceVersionAnnotation = "console.openshift.io/service-ca-config-version"
 	secretResourceVersionAnnotation             = "console.openshift.io/oauth-secret-version"
-	routeResourceVersionAnnotation              = "console.openshift.io/route-version"
 	consoleImageAnnotation                      = "console.openshift.io/image"
 )
 
@@ -44,7 +43,6 @@ var (
 		configMapResourceVersionAnnotation,
 		serviceCAConfigMapResourceVersionAnnotation,
 		secretResourceVersionAnnotation,
-		routeResourceVersionAnnotation,
 		consoleImageAnnotation,
 	}
 )
@@ -95,7 +93,6 @@ func DefaultDeployment(operatorConfig *operatorv1.Console, cm *corev1.ConfigMap,
 	meta.Annotations[configMapResourceVersionAnnotation] = cm.GetResourceVersion()
 	meta.Annotations[serviceCAConfigMapResourceVersionAnnotation] = serviceCAConfigMap.GetResourceVersion()
 	meta.Annotations[secretResourceVersionAnnotation] = sec.GetResourceVersion()
-	meta.Annotations[routeResourceVersionAnnotation] = rt.GetResourceVersion()
 	meta.Annotations[consoleImageAnnotation] = util.GetImageEnv()
 	replicas := int32(ConsoleReplicas)
 	gracePeriod := int64(30)
