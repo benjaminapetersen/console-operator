@@ -147,7 +147,7 @@ func sync_v400(co *consoleOperator, operatorConfig *operatorv1.Console, consoleC
 		logrus.Println(msg)
 		co.ConditionDeploymentNotAvailable(operatorConfig, msg)
 	} else if !routesub.IsAdmitted(rt) {
-		fmt.Println("console route is not admitted")
+		logrus.Println("console route is not admitted")
 		co.SetStatusCondition(
 			operatorConfig,
 			operatorv1.OperatorStatusTypeAvailable,
