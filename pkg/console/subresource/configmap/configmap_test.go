@@ -18,11 +18,11 @@ import (
 )
 
 const (
-	host           = "localhost"
-	mockAPIServer  = "https://api.some.cluster.openshift.com:6443"
-	mockConsoleURL = "https://console-openshift-console.apps.some.cluster.openshift.com"
-	configKey      = "console-config.yaml"
-	exampleYaml    = `kind: ConsoleConfig
+	host              = "localhost"
+	mockAPIServer     = "https://api.some.cluster.openshift.com:6443"
+	mockConsoleURL    = "https://console-openshift-console.apps.some.cluster.openshift.com"
+	configKey         = "console-config.yaml"
+	finalCMDefaultOKD = `kind: ConsoleConfig
 apiVersion: console.openshift.io/v1
 auth:
   clientID: console
@@ -41,13 +41,13 @@ servingInfo:
   certFile: /var/serving-cert/tls.crt
   keyFile: /var/serving-cert/tls.key
 `
-	exampleManagedConfigMapData = `kind: ConsoleConfig
+	managedCMOnline = `kind: ConsoleConfig
 apiVersion: console.openshift.io/v1
 customization:
   branding: online
-  documentationBaseURL: https://docs.okd.io/4.1/
+  documentationBaseURL: ` + DEFAULT_DOC_URL + `
 `
-	exampleYamlWithManagedConfig = `kind: ConsoleConfig
+	finalCMOnline = `kind: ConsoleConfig
 apiVersion: console.openshift.io/v1
 auth:
   clientID: console
@@ -60,7 +60,26 @@ clusterInfo:
   masterPublicURL: ` + mockAPIServer + `
 customization:
   branding: online 
-  documentationBaseURL: https://docs.okd.io/4.1/
+  documentationBaseURL: ` + DEFAULT_DOC_URL + `
+servingInfo:
+  bindAddress: https://0.0.0.0:8443
+  certFile: /var/serving-cert/tls.crt
+  keyFile: /var/serving-cert/tls.key
+`
+	finalCMDedicated = `kind: ConsoleConfig
+apiVersion: console.openshift.io/v1
+auth:
+  clientID: console
+  clientSecretFile: /var/oauth-config/clientSecret
+  logoutRedirect: ""
+  oauthEndpointCAFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+clusterInfo:
+  consoleBaseAddress: https://` + host + `
+  consoleBasePath: ""
+  masterPublicURL: ` + mockAPIServer + `
+customization:
+  branding: online 
+  documentationBaseURL: ` + DEFAULT_DOC_URL + `
 servingInfo:
   bindAddress: https://0.0.0.0:8443
   certFile: /var/serving-cert/tls.crt
@@ -83,68 +102,39 @@ func TestDefaultConfigMap(t *testing.T) {
 		want *corev1.ConfigMap
 	}{
 		{
-			name: "Test generating default configmap without managed config override",
+			name: "Generated default configmap, no overrides",
 			args: args{
-				operatorConfig: &operatorv1.Console{
-					TypeMeta:   metav1.TypeMeta{},
-					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       operatorv1.ConsoleSpec{},
-					Status:     operatorv1.ConsoleStatus{},
-				},
-				consoleConfig: &configv1.Console{
-					Spec:   configv1.ConsoleSpec{},
-					Status: configv1.ConsoleStatus{},
-				},
-				managedConfig: &corev1.ConfigMap{},
+				operatorConfig: &operatorv1.Console{},
+				consoleConfig:  &configv1.Console{},
+				managedConfig:  &corev1.ConfigMap{},
 				infrastructureConfig: &configv1.Infrastructure{
 					Status: configv1.InfrastructureStatus{
 						APIServerURL: mockAPIServer,
 					},
 				},
 				rt: &routev1.Route{
-					TypeMeta:   metav1.TypeMeta{},
-					ObjectMeta: metav1.ObjectMeta{},
 					Spec: routev1.RouteSpec{
 						Host: host,
 					},
-					Status: routev1.RouteStatus{},
 				},
 			},
 			want: &corev1.ConfigMap{
-				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        api.OpenShiftConsoleConfigMapName,
 					Namespace:   api.OpenShiftConsoleNamespace,
 					Labels:      map[string]string{"app": api.OpenShiftConsoleName},
 					Annotations: map[string]string{},
 				},
-				Data: map[string]string{configKey: exampleYaml},
+				Data: map[string]string{configKey: finalCMDefaultOKD},
 			},
 		},
 		{
-			name: "Test generating configmap with managed config to override branding",
+			name: "Generated configmap with internal managed config to override branding",
 			args: args{
-				operatorConfig: &operatorv1.Console{
-					TypeMeta:   metav1.TypeMeta{},
-					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       operatorv1.ConsoleSpec{},
-					Status:     operatorv1.ConsoleStatus{},
-				},
-				consoleConfig: &configv1.Console{
-					Spec:   configv1.ConsoleSpec{},
-					Status: configv1.ConsoleStatus{},
-				},
+				operatorConfig: &operatorv1.Console{},
+				consoleConfig:  &configv1.Console{},
 				managedConfig: &corev1.ConfigMap{
-					TypeMeta: metav1.TypeMeta{
-						Kind:       "ConfigMap",
-						APIVersion: "v1",
-					},
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "console-config",
-						Namespace: "openshift-config-managed",
-					},
-					Data:       map[string]string{configKey: exampleManagedConfigMapData},
-					BinaryData: nil,
+					Data: map[string]string{configKey: managedCMOnline},
 				},
 				infrastructureConfig: &configv1.Infrastructure{
 					Status: configv1.InfrastructureStatus{
@@ -152,25 +142,51 @@ func TestDefaultConfigMap(t *testing.T) {
 					},
 				},
 				rt: &routev1.Route{
-					TypeMeta:   metav1.TypeMeta{},
-					ObjectMeta: metav1.ObjectMeta{},
 					Spec: routev1.RouteSpec{
 						Host: host,
 					},
-					Status: routev1.RouteStatus{},
 				},
 			},
 			want: &corev1.ConfigMap{
-				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        api.OpenShiftConsoleConfigMapName,
 					Namespace:   api.OpenShiftConsoleNamespace,
 					Labels:      map[string]string{"app": api.OpenShiftConsoleName},
 					Annotations: map[string]string{},
 				},
-				Data: map[string]string{configKey: exampleYamlWithManagedConfig},
+				Data: map[string]string{configKey: finalCMOnline},
 			},
 		},
+
+		//{
+		//	name: "Generated configmap with both internal managed config to override branding and operator config to override branding, ensuring operator config priority",
+		//	args: args{
+		//		operatorConfig: &operatorv1.Console{
+		//			Spec: operatorv1.ConsoleSpec{
+		//				Customization: operatorv1.ConsoleCustomization{
+		//					// we want dedicated to win
+		//					Brand: operatorv1.BrandDedicated,
+		//				},
+		//			},
+		//		},
+		//		consoleConfig: &configv1.Console{},
+		//		managedConfig: &corev1.ConfigMap{
+		//			// any non-dedicated value here
+		//			Data: map[string]string{configKey: managedCMOnline},
+		//		},
+		//		infrastructureConfig: &configv1.Infrastructure{},
+		//		rt:                   &routev1.Route{},
+		//	},
+		//	want: &corev1.ConfigMap{
+		//		// TODO: Dedicated from OperatorConfig should win over the brand
+		//		// from the managed config
+		//		Data: map[string]string{configKey: finalCMDedicated},
+		//	},
+		//},
+
+		//{
+		//	name: "Generted configmap with operator config unsupported config overrides priority over all other config",
+		//},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -236,12 +252,12 @@ func TestStub(t *testing.T) {
 					CreationTimestamp:          metav1.Time{},
 					DeletionTimestamp:          nil,
 					DeletionGracePeriodSeconds: nil,
-					Labels:          map[string]string{"app": api.OpenShiftConsoleName},
-					Annotations:     map[string]string{},
-					OwnerReferences: nil,
-					Initializers:    nil,
-					Finalizers:      nil,
-					ClusterName:     "",
+					Labels:                     map[string]string{"app": api.OpenShiftConsoleName},
+					Annotations:                map[string]string{},
+					OwnerReferences:            nil,
+					Initializers:               nil,
+					Finalizers:                 nil,
+					ClusterName:                "",
 				},
 				BinaryData: nil,
 				Data:       nil,
@@ -277,12 +293,12 @@ func TestDefaultPublicConfigMap(t *testing.T) {
 					CreationTimestamp:          metav1.Time{},
 					DeletionTimestamp:          nil,
 					DeletionGracePeriodSeconds: nil,
-					Labels:          nil,
-					Annotations:     nil,
-					OwnerReferences: nil,
-					Initializers:    nil,
-					Finalizers:      nil,
-					ClusterName:     "",
+					Labels:                     nil,
+					Annotations:                nil,
+					OwnerReferences:            nil,
+					Initializers:               nil,
+					Finalizers:                 nil,
+					ClusterName:                "",
 				},
 				Data: map[string]string{"consoleURL": mockConsoleURL},
 			},
@@ -321,7 +337,7 @@ func TestNewYamlConfig(t *testing.T) {
 				docURL:         DEFAULT_DOC_URL,
 				apiServerURL:   mockAPIServer,
 			},
-			want: exampleYaml,
+			want: finalCMDefaultOKD,
 		},
 	}
 	for _, tt := range tests {
@@ -380,7 +396,7 @@ func Test_extractYAML(t *testing.T) {
 						Name:      "console-config",
 						Namespace: "openshift-config-managed",
 					},
-					Data:       map[string]string{configKey: exampleManagedConfigMapData},
+					Data:       map[string]string{configKey: managedCMOnline},
 					BinaryData: nil,
 				},
 			},

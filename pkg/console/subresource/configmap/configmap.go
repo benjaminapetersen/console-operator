@@ -33,27 +33,6 @@ const (
 	defaultLogoutURL = ""
 )
 
-func getLogoutRedirect(consoleConfig *configv1.Console) string {
-	if len(consoleConfig.Spec.Authentication.LogoutRedirect) > 0 {
-		return consoleConfig.Spec.Authentication.LogoutRedirect
-	}
-	return defaultLogoutURL
-}
-
-func getBrand(operatorConfig *operatorv1.Console) operatorv1.Brand {
-	if len(operatorConfig.Spec.Customization.Brand) > 0 {
-		return operatorConfig.Spec.Customization.Brand
-	}
-	return DEFAULT_BRAND
-}
-
-func getDocURL(operatorConfig *operatorv1.Console) string {
-	if len(operatorConfig.Spec.Customization.DocumentationBaseURL) > 0 {
-		return operatorConfig.Spec.Customization.DocumentationBaseURL
-	}
-	return DEFAULT_DOC_URL
-}
-
 func getApiUrl(infrastructureConfig *configv1.Infrastructure) string {
 	if infrastructureConfig != nil {
 		return infrastructureConfig.Status.APIServerURL
@@ -66,21 +45,32 @@ func getApiUrl(infrastructureConfig *configv1.Infrastructure) string {
 // - a bool indicating if config was merged (unsupportedConfigOverrides)
 // - an error
 func DefaultConfigMap(operatorConfig *operatorv1.Console, consoleConfig *configv1.Console, managedConfig *corev1.ConfigMap, infrastructureConfig *configv1.Infrastructure, rt *routev1.Route) (*corev1.ConfigMap, bool, error) {
-	logoutRedirect := getLogoutRedirect(consoleConfig)
-	brand := getBrand(operatorConfig)
-	docURL := getDocURL(operatorConfig)
+	// SO: for unit testing, this is the priority:
+	// the default brand is OKD.  this should be set, if there is NOTHING provided from operator
+	// then the managed config should be applied, which may be OCP
+	// then, if the operator config provides something like ONLINE, it should be applied
+	// finally, if unsupported config overrides applies DEDICATED, this should win.
+	logoutRedirect := consoleConfig.Spec.Authentication.LogoutRedirect
+	brand := operatorConfig.Spec.Customization.Brand
+	docURL := operatorConfig.Spec.Customization.DocumentationBaseURL
 	apiServerURL := getApiUrl(infrastructureConfig)
-
 	host := rt.Spec.Host
-	config := NewYamlConfig(host, logoutRedirect, brand, docURL, apiServerURL)
 
 	configMap := Stub()
 	configMap.Data = map[string]string{}
-	unsupportedRaw := operatorConfig.Spec.UnsupportedConfigOverrides.Raw
-	newConfig := extractYAML(managedConfig)
 
-	// merge config overrides, if we have them
-	mergedConfig, err := resourcemerge.MergeProcessConfig(nil, config, newConfig, unsupportedRaw)
+	// these configs are layered to generate the final configmap for the console
+	// first use the defaults
+	// each apply should override the previous, BUT
+	// TODO: a later nil should not wipe out a previous set value.
+	// this is currently the problem with the func
+	emptyStartConfig := NewYamlConfig("", defaultLogoutURL, DEFAULT_BRAND, DEFAULT_DOC_URL, "")
+	extractedManagedConfig := extractYAML(managedConfig)
+	userDefinedConfig := NewYamlConfig(host, logoutRedirect, brand, docURL, apiServerURL)
+	unsupportedRaw := operatorConfig.Spec.UnsupportedConfigOverrides.Raw
+
+	// order matters
+	mergedConfig, err := resourcemerge.MergeProcessConfig(nil, emptyStartConfig, extractedManagedConfig, userDefinedConfig, unsupportedRaw)
 	if err != nil {
 		logrus.Errorf("failed to merge configmap: %v \n", err)
 		return nil, false, err
