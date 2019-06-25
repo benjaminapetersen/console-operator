@@ -13,23 +13,23 @@ import (
 
 	operatorsv1 "github.com/openshift/api/operator/v1"
 	consoleapi "github.com/openshift/console-operator/pkg/api"
-	"github.com/openshift/console-operator/pkg/testframework"
+	"github.com/openshift/console-operator/test/e2e/framework"
 )
 
 var validOperatorConfigBrands = []operatorsv1.Brand{operatorsv1.BrandOKD, operatorsv1.BrandOCP, operatorsv1.BrandOnline, operatorsv1.BrandDedicated, operatorsv1.BrandAzure}
 var validManagedConfigMapBrands = []operatorsv1.Brand{operatorsv1.BrandOKD, operatorsv1.BrandOCP}
 
 // Test prep - setup the client used by each test
-func setupBrandingTestCase(t *testing.T) (*testframework.Clientset, operatorsv1.Brand, map[string]string) {
-	client := testframework.MustNewClientset(t, nil)
+func setupBrandingTestCase(t *testing.T) (*framework.ClientSet, operatorsv1.Brand, map[string]string) {
+	client := framework.MustNewClientset(t, nil)
 	// Get the original operator config
-	originalConfig, err := client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
+	originalConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("could not get operator config, %v", err)
 	}
 	originalConfigBrand := originalConfig.Spec.Customization.Brand
 	// Get the original Managed Config Map
-	originalManagedConfigMap, err := client.ConfigMaps(consoleapi.OpenShiftConfigManagedNamespace).Get(consoleapi.OpenShiftConsoleConfigMapName, metav1.GetOptions{})
+	originalManagedConfigMap, err := client.Core.ConfigMaps(consoleapi.OpenShiftConfigManagedNamespace).Get(consoleapi.OpenShiftConsoleConfigMapName, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		t.Fatalf("could not get console-config configmap, %v", err)
 	}
@@ -37,7 +37,7 @@ func setupBrandingTestCase(t *testing.T) (*testframework.Clientset, operatorsv1.
 	return client, originalConfigBrand, originalManagedConfigMap.Data
 }
 
-func cleanupBrandingTestCase(t *testing.T, client *testframework.Clientset, originalConfigBrand operatorsv1.Brand, originalManagedConfigMapData map[string]string) {
+func cleanupBrandingTestCase(t *testing.T, client *framework.ClientSet, originalConfigBrand operatorsv1.Brand, originalManagedConfigMapData map[string]string) {
 
 	setOperatorConfigBrand(t, client, originalConfigBrand)
 
@@ -45,11 +45,11 @@ func cleanupBrandingTestCase(t *testing.T, client *testframework.Clientset, orig
 	if originalManagedConfigMapData != nil {
 		managedConfigMap.Data = originalManagedConfigMapData
 	}
-	_, err := client.ConfigMaps(consoleapi.OpenShiftConfigManagedNamespace).Update(managedConfigMap)
+	_, err := client.Core.ConfigMaps(consoleapi.OpenShiftConfigManagedNamespace).Update(managedConfigMap)
 	if err != nil {
 		t.Fatalf("could not reset managed config map  %v", err)
 	}
-	testframework.WaitForSettledState(t, client)
+	framework.WaitForSettledState(t, client)
 }
 
 // TestOperatorConfigBranding() tests that changing the brand value on the operator-config
@@ -128,8 +128,8 @@ customization:
 }
 
 // Set Brand on the operator config
-func setOperatorConfigBrand(t *testing.T, client *testframework.Clientset, brand operatorsv1.Brand) {
-	operatorConfig, err := client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
+func setOperatorConfigBrand(t *testing.T, client *framework.ClientSet, brand operatorsv1.Brand) {
+	operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("could not get operator config, %v", err)
 	}
@@ -142,15 +142,15 @@ func setOperatorConfigBrand(t *testing.T, client *testframework.Clientset, brand
 		},
 	}
 	operatorConfig.Spec = spec
-	_, err = client.Consoles().Update(operatorConfig)
+	_, err = client.Operator.Consoles().Update(operatorConfig)
 	if err != nil {
 		t.Fatalf("could not update operator config with brand=%v, %v", brand, err)
 	}
 }
 
 // Get the brand from the console-config in the data of the console CM
-func getConsoleBrand(t *testing.T, client *testframework.Clientset) operatorsv1.Brand {
-	cm, err := testframework.GetConsoleConfigMap(client)
+func getConsoleBrand(t *testing.T, client *framework.ClientSet) operatorsv1.Brand {
+	cm, err := framework.GetConsoleConfigMap(client)
 	if err != nil {
 		t.Fatalf("error: %s", err)
 	}
@@ -185,14 +185,14 @@ func stringToBrand(brandstr string) (b operatorsv1.Brand, ok bool) {
 }
 
 // Helper function that decides whether to update a config map (if it exists) or create a new one
-func updateOrCreateConsoleConfigMap(client *testframework.Clientset, cm *v1.ConfigMap) (*v1.ConfigMap, error) {
+func updateOrCreateConsoleConfigMap(client *framework.ClientSet, cm *v1.ConfigMap) (*v1.ConfigMap, error) {
 	// Check if configMap exist so we know whether to update or create
-	_, err := client.ConfigMaps(cm.ObjectMeta.Namespace).Get(cm.Name, metav1.GetOptions{})
+	_, err := client.Core.ConfigMaps(cm.ObjectMeta.Namespace).Get(cm.Name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		return client.ConfigMaps(cm.ObjectMeta.Namespace).Create(cm)
+		return client.Core.ConfigMaps(cm.ObjectMeta.Namespace).Create(cm)
 	} else if err != nil {
 		return nil, err
 	}
-	return client.ConfigMaps(cm.ObjectMeta.Namespace).Update(cm)
+	return client.Core.ConfigMaps(cm.ObjectMeta.Namespace).Update(cm)
 
 }

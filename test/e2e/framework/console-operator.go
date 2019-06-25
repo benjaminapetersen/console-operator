@@ -1,4 +1,4 @@
-package testframework
+package framework
 
 import (
 	"fmt"
@@ -12,6 +12,43 @@ import (
 	operatorsv1 "github.com/openshift/api/operator/v1"
 	consoleapi "github.com/openshift/console-operator/pkg/api"
 )
+
+func StandardSetup(t *testing.T) (*ClientSet, *operatorsv1.Console) {
+	client := MustNewClientset(t, nil)
+	operatorConfig := MustPristine(t, client)
+	WaitForSettledState(t, client)
+	return client, operatorConfig
+}
+
+func StandardCleanup(t *testing.T, client *ClientSet) {
+	MustPristine(t, client)
+	WaitForSettledState(t, client)
+}
+
+// set the operator config to a pristine state to start a next round of tests
+// this should by default nullify out any customizations a user sets
+func Pristine(t *testing.T, client *ClientSet) (*operatorsv1.Console, error) {
+	operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	copy := operatorConfig.DeepCopy()
+	cleanSpec := operatorsv1.ConsoleSpec{}
+	// we can set a default management state & log level, but
+	// nothing else should be necessary
+	cleanSpec.ManagementState = operatorsv1.Managed
+	cleanSpec.LogLevel = operatorsv1.Normal
+	copy.Spec = cleanSpec
+	return client.Operator.Consoles().Update(copy)
+}
+
+func MustPristine(t *testing.T, client *ClientSet) *operatorsv1.Console {
+	operatorConfig, err := Pristine(t, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return operatorConfig
+}
 
 func isOperatorManaged(cr *operatorsv1.Console) bool {
 	return cr.Spec.ManagementState == operatorsv1.Managed
@@ -27,7 +64,7 @@ func isOperatorRemoved(cr *operatorsv1.Console) bool {
 
 type operatorStateReactionFn func(cr *operatorsv1.Console) bool
 
-func ensureConsoleIsInDesiredState(t *testing.T, client *Clientset, state operatorsv1.ManagementState) error {
+func ensureConsoleIsInDesiredState(t *testing.T, client *ClientSet, state operatorsv1.ManagementState) error {
 	var operatorConfig *operatorsv1.Console
 	// var checkFunc func()
 	var checkFunc operatorStateReactionFn
@@ -42,7 +79,7 @@ func ensureConsoleIsInDesiredState(t *testing.T, client *Clientset, state operat
 	}
 
 	err := wait.Poll(1*time.Second, AsyncOperationTimeout, func() (stop bool, err error) {
-		operatorConfig, err = client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
+		operatorConfig, err = client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -56,8 +93,8 @@ func ensureConsoleIsInDesiredState(t *testing.T, client *Clientset, state operat
 	return nil
 }
 
-func ManageConsole(t *testing.T, client *Clientset) error {
-	operatorConfig, err := client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
+func ManageConsole(t *testing.T, client *ClientSet) error {
+	operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -69,7 +106,7 @@ func ManageConsole(t *testing.T, client *Clientset) error {
 
 	t.Logf("changing console operator state to 'Managed'...")
 
-	_, err = client.Consoles().Patch(consoleapi.ConfigResourceName, types.MergePatchType, []byte(`{"spec": {"managementState": "Managed"}}`))
+	_, err = client.Operator.Consoles().Patch(consoleapi.ConfigResourceName, types.MergePatchType, []byte(`{"spec": {"managementState": "Managed"}}`))
 	if err != nil {
 		return err
 	}
@@ -85,8 +122,8 @@ func ManageConsole(t *testing.T, client *Clientset) error {
 	return nil
 }
 
-func UnmanageConsole(t *testing.T, client *Clientset) error {
-	operatorConfig, err := client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
+func UnmanageConsole(t *testing.T, client *ClientSet) error {
+	operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -98,7 +135,7 @@ func UnmanageConsole(t *testing.T, client *Clientset) error {
 
 	t.Logf("changing console operator state to 'Unmanaged'...")
 
-	_, err = client.Consoles().Patch(consoleapi.ConfigResourceName, types.MergePatchType, []byte(`{"spec": {"managementState": "Unmanaged"}}`))
+	_, err = client.Operator.Consoles().Patch(consoleapi.ConfigResourceName, types.MergePatchType, []byte(`{"spec": {"managementState": "Unmanaged"}}`))
 	if err != nil {
 		return err
 	}
@@ -109,8 +146,8 @@ func UnmanageConsole(t *testing.T, client *Clientset) error {
 	return nil
 }
 
-func RemoveConsole(t *testing.T, client *Clientset) error {
-	operatorConfig, err := client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
+func RemoveConsole(t *testing.T, client *ClientSet) error {
+	operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -122,7 +159,7 @@ func RemoveConsole(t *testing.T, client *Clientset) error {
 
 	t.Logf("changing console operator state to 'Removed'...")
 
-	_, err = client.Consoles().Patch(consoleapi.ConfigResourceName, types.MergePatchType, []byte(`{"spec": {"managementState": "Removed"}}`))
+	_, err = client.Operator.Consoles().Patch(consoleapi.ConfigResourceName, types.MergePatchType, []byte(`{"spec": {"managementState": "Removed"}}`))
 	if err != nil {
 		return err
 	}
@@ -132,29 +169,29 @@ func RemoveConsole(t *testing.T, client *Clientset) error {
 
 	return nil
 }
-func MustManageConsole(t *testing.T, client *Clientset) error {
+func MustManageConsole(t *testing.T, client *ClientSet) error {
 	if err := ManageConsole(t, client); err != nil {
 		t.Fatal(err)
 	}
 	return nil
 }
 
-func MustUnmanageConsole(t *testing.T, client *Clientset) error {
+func MustUnmanageConsole(t *testing.T, client *ClientSet) error {
 	if err := UnmanageConsole(t, client); err != nil {
 		t.Fatal(err)
 	}
 	return nil
 }
 
-func MustRemoveConsole(t *testing.T, client *Clientset) error {
+func MustRemoveConsole(t *testing.T, client *ClientSet) error {
 	if err := RemoveConsole(t, client); err != nil {
 		t.Fatal(err)
 	}
 	return nil
 }
 
-func MustNormalLogLevel(t *testing.T, client *Clientset) error {
-	operatorConfig, err := client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
+func MustNormalLogLevel(t *testing.T, client *ClientSet) error {
+	operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,8 +206,8 @@ func MustNormalLogLevel(t *testing.T, client *Clientset) error {
 	return nil
 }
 
-func SetLogLevel(t *testing.T, client *Clientset, logLevel operatorsv1.LogLevel) error {
-	operatorConfig, err := client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
+func SetLogLevel(t *testing.T, client *ClientSet, logLevel operatorsv1.LogLevel) error {
+	operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -182,13 +219,13 @@ func SetLogLevel(t *testing.T, client *Clientset, logLevel operatorsv1.LogLevel)
 	currentOperatorConfigGeneration := operatorConfig.ObjectMeta.Generation
 
 	t.Logf("setting console operator to '%s' LogLevel ...", logLevel)
-	_, err = client.Consoles().Patch(consoleapi.ConfigResourceName, types.MergePatchType, []byte(fmt.Sprintf(`{"spec": {"logLevel": "%s"}}`, logLevel)))
+	_, err = client.Operator.Consoles().Patch(consoleapi.ConfigResourceName, types.MergePatchType, []byte(fmt.Sprintf(`{"spec": {"logLevel": "%s"}}`, logLevel)))
 	if err != nil {
 		return err
 	}
 
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
-		newOperatorConfig, err := client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
+		newOperatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 		newDeployment, err := GetConsoleDeployment(client)
 		if err != nil {
 			return false, nil
@@ -242,15 +279,35 @@ func operatorIsSettled(operatorConfig *operatorsv1.Console) bool {
 
 // A helper to ensure our operator config reaches a settled state before we
 // begin the next test.
-func WaitForSettledState(t *testing.T, client *Clientset) (settled bool, err error) {
+func WaitForSettledState(t *testing.T, client *ClientSet) (settled bool, err error) {
 	interval := 1 * time.Second
 	// it should never take this long for a test to pass
-	max := 60 * time.Second
+	max := 90 * time.Second
+	count := 0
 	pollErr := wait.Poll(interval, max, func() (stop bool, err error) {
-		operatorConfig, err := client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
+		// lets be informed about tests that take a long time to settle
+		count++
+		if count == 15 {
+			fmt.Printf("waited %d seconds to reach settled state...\n", count)
+		}
+		if count == 30 {
+			fmt.Printf("waited %d seconds to reach settled state...\n", count)
+		}
+		if count == 45 {
+			fmt.Printf("waited %d seconds to reach settled state...\n", count)
+		}
+		if count == 60 {
+			fmt.Printf("waited %d seconds to reach settled state...\n", count)
+		}
+		operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
+		// first, wait until we are observing the correct generation
+		if operatorConfig.Status.ObservedGeneration != operatorConfig.ObjectMeta.Generation {
+			return false, nil
+		}
+		// then wait until the operator status settle
 		return operatorIsSettled(operatorConfig), nil
 	})
 	if pollErr != nil {

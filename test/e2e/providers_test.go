@@ -10,7 +10,7 @@ import (
 
 	operatorsv1 "github.com/openshift/api/operator/v1"
 	consoleapi "github.com/openshift/console-operator/pkg/api"
-	"github.com/openshift/console-operator/pkg/testframework"
+	"github.com/openshift/console-operator/test/e2e/framework"
 )
 
 const (
@@ -18,32 +18,18 @@ const (
 	providersField    = "providers"
 )
 
-func setupProvidersTestCase(t *testing.T) (*testframework.Clientset, operatorsv1.ConsoleSpec) {
-	client := testframework.MustNewClientset(t, nil)
-	testframework.MustManageConsole(t, client)
-	operatorConfig, err := client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("error: %s", err)
-	}
-	return client, operatorConfig.Spec
+func setupProvidersTestCase(t *testing.T) (*framework.ClientSet, *operatorsv1.Console) {
+	client, operatorConfig := framework.StandardSetup(t)
+	return client, operatorConfig
 }
 
-func cleanupProvidersTestCase(t *testing.T, client *testframework.Clientset, originalOperatorConfigSpec operatorsv1.ConsoleSpec) {
-	operatorConfig, err := client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("could not get operator config, %v", err)
-	}
-	operatorConfig.Spec = originalOperatorConfigSpec
-	_, err = client.Consoles().Update(operatorConfig)
-	if err != nil {
-		t.Fatalf("could not reset operator config to it's default state: %v", err)
-	}
-	testframework.WaitForSettledState(t, client)
+func cleanupProvidersTestCase(t *testing.T, client *framework.ClientSet) {
+	framework.StandardCleanup(t, client)
 }
 
 func TestProvidersSetStatuspageID(t *testing.T) {
-	client, originalOperatorConfigSpec := setupProvidersTestCase(t)
-	defer cleanupProvidersTestCase(t, client, originalOperatorConfigSpec)
+	client, _ := setupProvidersTestCase(t)
+	defer cleanupProvidersTestCase(t, client)
 	expectedStatuspageID := "id-1234"
 	currentStatuspageID := ""
 	setOperatorConfigStatuspageIDProvider(t, client, expectedStatuspageID)
@@ -61,8 +47,8 @@ func TestProvidersSetStatuspageID(t *testing.T) {
 }
 
 func TestProvidersSetStatuspageIDEmpty(t *testing.T) {
-	client, originalOperatorConfigSpec := setupProvidersTestCase(t)
-	defer cleanupProvidersTestCase(t, client, originalOperatorConfigSpec)
+	client, _ := setupProvidersTestCase(t)
+	defer cleanupProvidersTestCase(t, client)
 	statuspageID := ""
 	currentProviders := ""
 	expectedProviders := "{}"
@@ -80,8 +66,8 @@ func TestProvidersSetStatuspageIDEmpty(t *testing.T) {
 	}
 }
 
-func getConsoleProviderField(t *testing.T, client *testframework.Clientset, providerField string) string {
-	cm, err := testframework.GetConsoleConfigMap(client)
+func getConsoleProviderField(t *testing.T, client *framework.ClientSet, providerField string) string {
+	cm, err := framework.GetConsoleConfigMap(client)
 	if err != nil {
 		t.Fatalf("error: %s", err)
 	}
@@ -98,8 +84,8 @@ func getConsoleProviderField(t *testing.T, client *testframework.Clientset, prov
 	return field
 }
 
-func setOperatorConfigStatuspageIDProvider(t *testing.T, client *testframework.Clientset, statuspageID string) {
-	operatorConfig, err := client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
+func setOperatorConfigStatuspageIDProvider(t *testing.T, client *framework.ClientSet, statuspageID string) {
+	operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("could not get operator config, %v", err)
 	}
@@ -114,7 +100,7 @@ func setOperatorConfigStatuspageIDProvider(t *testing.T, client *testframework.C
 			},
 		},
 	}
-	_, err = client.Consoles().Update(operatorConfig)
+	_, err = client.Operator.Consoles().Update(operatorConfig)
 	if err != nil {
 		t.Fatalf("could not update operator config providers statupageID: %v", err)
 	}
