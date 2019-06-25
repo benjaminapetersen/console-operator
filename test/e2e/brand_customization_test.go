@@ -1,101 +1,146 @@
 package e2e
 
 import (
-	"strings"
+	"errors"
 	"testing"
 	"time"
 
+	yaml "gopkg.in/yaml.v2"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operatorsv1 "github.com/openshift/api/operator/v1"
 	consoleapi "github.com/openshift/console-operator/pkg/api"
-	"github.com/openshift/console-operator/pkg/testframework"
+	"github.com/openshift/console-operator/pkg/console/subresource/consoleserver"
+	"github.com/openshift/console-operator/test/e2e/framework"
 )
 
 const (
-	testCustomProductName    = "custom product name"
-	customLogoVolumeName     = "custom-logo"
-	customBrandConfigMapName = "custom-brand-configmap"
-	customBrandImageKey      = "pic.png"
-	customLogoMountPath      = "/var/logo/"
+	customLogoVolumeName = "custom-logo"
+	customLogoMountPath  = "/var/logo/"
 )
 
-// Test prep - setup the client used by each test
-func setupCustomTestCase(t *testing.T) (*testframework.Clientset, operatorsv1.ConsoleCustomization) {
-	client := testframework.MustNewClientset(t, nil)
-	// Get the original operator config
-	originalConfig, err := client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("could not get operator config, %v", err)
-	}
-	originalConfigCustomization := originalConfig.Spec.Customization
-
-	return client, originalConfigCustomization
+func setupCustomBrandTest(t *testing.T) (*framework.ClientSet, *operatorsv1.Console) {
+	return framework.StandardSetup(t)
 }
-
-func cleanupCustomizationTestCase(t *testing.T, client *testframework.Clientset, originalConfigCustomization operatorsv1.ConsoleCustomization) {
-
-	setOperatorConfigCustomization(t, client, originalConfigCustomization)
-
-	err := client.ConfigMaps("openshift-config").Delete(customBrandConfigMapName, &metav1.DeleteOptions{})
-	if err != nil {
-		t.Fatalf("could not delete test configmap, %v", err)
-	}
-	testframework.WaitForSettledState(t, client)
+func cleanupCustomBrandTest(t *testing.T, client *framework.ClientSet) {
+	framework.StandardCleanup(t, client)
 }
 
 // TestBrandCustomization() tests that changing the customization values on the operator-config
 // will result in the customization being set on the console-config in openshift-console.
 // Implicitly it ensures that the operator-config customization overrides customization set on
 // console-config in openshift-config-managed, if the managed configmap exists.
-func TestBrandCustomization(t *testing.T) {
-	client, originalConfigCustomization := setupCustomTestCase(t)
-	defer cleanupCustomizationTestCase(t, client, originalConfigCustomization)
+func TestCustomBrand(t *testing.T) {
+	client, operatorConfig := setupCustomBrandTest(t)
 
-	// Create configmap with logo in namespace openshift-config
-	// Manual cmd: oc create configmap test-configmap --from-file=pic.jpg -n openshift-config
-	_, err := createLogoConfigMap(client)
-	if err != nil {
-		t.Fatalf("error: could not create logo configmap, %v", err)
-	}
-	// Set customization options on the operatorConfig
-	customData := operatorsv1.ConsoleCustomization{
-		CustomProductName: testCustomProductName,
-		CustomLogoFile: configv1.ConfigMapFileReference{
-			Name: customBrandConfigMapName,
-			Key:  customBrandImageKey,
-		},
-	}
-	setOperatorConfigCustomization(t, client, customData)
+	// create a configmap with the new logo
+	customProductName := "custom name"
+	customLogoConfigMapName := "custom-logo"
+	customLogoFileName := "pic.png"
 
-	// Verify options appear in the console-config in openshift-console
-	err = wait.Poll(1*time.Second, 10*time.Second, func() (stop bool, err error) {
-		productName, logo := getConsoleConfigCustomizations(t, client)
-		return (productName == testCustomProductName) && (logo == customLogoMountPath+customBrandImageKey), nil
+	_, err := createCustomLogoConfigMap(client, customLogoConfigMapName, customLogoFileName)
+	if err != nil && !apiErrors.IsAlreadyExists(err) {
+		t.Fatalf("could not create custom logo configmap, %v", err)
+	}
+
+	// update the operator config with custom branding
+	operatorConfigWithCustomLogo := withCustomBrand(*operatorConfig, customProductName, customLogoConfigMapName, customLogoFileName)
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		operatorConfigWithCustomLogo, err = client.Operator.Consoles().Update(operatorConfigWithCustomLogo)
+		return err
 	})
 	if err != nil {
-		t.Fatalf("error: customization values not found  %v", err)
+		t.Fatalf("could not update operator config with custom product name %v and logo %v via configmap %v (%v)", customProductName, customLogoFileName, customLogoConfigMapName, err)
 	}
 
-	// Verify mounts and volumes appear correctly on the deployment console in openshift-console
-	// This can take a while to settle
+	// check console-config in openshift-console and verify the config has made it through
+	err = wait.Poll(1*time.Second, 10*time.Second, func() (stop bool, err error) {
+		cm, err := framework.GetConsoleConfigMap(client)
+		if hasCustomBranding(cm, customProductName, customLogoFileName) {
+			return true, nil
+		}
+		return false, err
+	})
+	if err != nil {
+		t.Fatalf("custom branding not found in console config in openshift-console namespace")
+	}
+
+	// ensure that custom-logo in openshift-console has been created
+	err = wait.Poll(1*time.Second, 10*time.Second, func() (stop bool, err error) {
+		_, err = framework.GetCustomLogoConfigMap(client)
+		if apiErrors.IsNotFound(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("configmap custom-logo not found in openshift-console")
+	}
+
+	// ensure the volume mounts have been added to the deployment
 	longPollTimeout := 120 * time.Second
 	err = wait.Poll(1*time.Second, longPollTimeout, func() (stop bool, err error) {
-		deployment, err := testframework.GetConsoleDeployment(client)
-		foundCustomizationVolume := findCustomizationVolume(deployment)
-		foundCustomizationMount := findCustomizationVolumeMount(deployment)
-		return foundCustomizationVolume && foundCustomizationMount, nil
+		deployment, err := framework.GetConsoleDeployment(client)
+		volume := findCustomLogoVolume(deployment)
+		volumeMount := findCustomLogoVolumeMount(deployment)
+		return volume && volumeMount, nil
 	})
 	if err != nil {
 		t.Fatalf("error: customization values not on deployment, %v", err)
 	}
+
+	// remove the custom logo from the operator config
+	operatorConfigWithoutCustomLogo := operatorConfigWithCustomLogo.DeepCopy()
+	operatorConfigWithoutCustomLogo.Spec.Customization = operatorsv1.ConsoleCustomization{}
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		operatorConfigWithoutCustomLogo, err = client.Operator.Consoles().Update(operatorConfigWithoutCustomLogo)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("could not clear customizations from operator config: %v", err)
+
+	}
+
+	// ensure that the custom-logo configmap in openshift-console has been removed
+	err = wait.Poll(1*time.Second, 10*time.Second, func() (stop bool, err error) {
+		_, err = framework.GetCustomLogoConfigMap(client)
+		if apiErrors.IsNotFound(err) {
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return true, errors.New("configmap custom-logo was not removed")
+	})
+	if err != nil {
+		t.Fatalf("configmap custom-logo not found in openshift-console")
+	}
+
+	deleteCustomLogoConfigMap(client, customLogoConfigMapName)
+
+	// Final line: cleanup after ourselves
+	cleanupCustomBrandTest(t, client)
 }
 
-func findCustomizationVolume(deployment *appsv1.Deployment) bool {
+func hasCustomBranding(cm *v1.ConfigMap, desiredProductName string, desiredLogoFileName string) bool {
+	consoleConfig := consoleserver.Config{}
+	yaml.Unmarshal([]byte(cm.Data["console-config.yaml"]), &consoleConfig)
+	actualProductName := consoleConfig.Customization.CustomProductName
+	actualLogoFile := consoleConfig.Customization.CustomLogoFile
+	return (desiredProductName == actualProductName) && ("/var/logo/"+desiredLogoFileName == actualLogoFile)
+}
+
+func findCustomLogoVolume(deployment *appsv1.Deployment) bool {
 	volumes := deployment.Spec.Template.Spec.Volumes
 	for _, volume := range volumes {
 		if volume.Name == customLogoVolumeName {
@@ -105,7 +150,7 @@ func findCustomizationVolume(deployment *appsv1.Deployment) bool {
 	return false
 }
 
-func findCustomizationVolumeMount(deployment *appsv1.Deployment) bool {
+func findCustomLogoVolumeMount(deployment *appsv1.Deployment) bool {
 	mounts := deployment.Spec.Template.Spec.Containers[0].VolumeMounts
 	for _, mount := range mounts {
 		if (mount.Name == customLogoVolumeName) && (mount.MountPath == customLogoMountPath) {
@@ -115,52 +160,21 @@ func findCustomizationVolumeMount(deployment *appsv1.Deployment) bool {
 	return false
 }
 
-// Set Customization on the operator config
-func setOperatorConfigCustomization(t *testing.T, client *testframework.Clientset, cust operatorsv1.ConsoleCustomization) {
-	operatorConfig, err := client.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("could not get operator config, %v", err)
-	}
-	spec := operatorsv1.ConsoleSpec{
-		OperatorSpec: operatorsv1.OperatorSpec{
-			ManagementState: "Managed",
+// dont pass a pointer, we want a copy
+func withCustomBrand(operatorConfig operatorsv1.Console, productName string, configMapName string, fileName string) *operatorsv1.Console {
+	operatorConfig.Spec.Customization = operatorsv1.ConsoleCustomization{
+		CustomProductName: productName,
+		CustomLogoFile: configv1.ConfigMapFileReference{
+			Name: configMapName,
+			Key:  fileName,
 		},
-		Customization: cust,
 	}
-	operatorConfig.Spec = spec
-	_, err = client.Consoles().Update(operatorConfig)
-	if err != nil {
-		t.Fatalf("could not update operator config with customization=%v, %v", cust, err)
-	}
+	return &operatorConfig
 }
 
-// Get the brand from the console-config in the data of the console CM
-func getConsoleConfigCustomizations(t *testing.T, client *testframework.Clientset) (string, string) {
-	cm, err := testframework.GetConsoleConfigMap(client)
-	if err != nil {
-		t.Fatalf("error: %s", err)
-	}
-
-	data := cm.Data["console-config.yaml"]
-	logoValue := ""
-	customProductName := ""
-	temp := strings.Split(data, "\n")
-	for _, item := range temp {
-		if strings.Contains(item, "customLogoFile") {
-			logoValue = strings.Split(strings.TrimSpace(item), ":")[1]
-		}
-		if strings.Contains(item, "customProductName") {
-			customProductName = strings.Split(strings.TrimSpace(item), ":")[1]
-		}
-	}
-	t.Logf("configmap console-config contains productName:%s, logo:%s", customProductName, logoValue)
-	return strings.TrimSpace(customProductName), strings.TrimSpace(logoValue)
-}
-
-// Helper function that creates a test configmap with binarydata
-func createLogoConfigMap(client *testframework.Clientset) (*v1.ConfigMap, error) {
+func customLogoConfigmap(configMapName string, imageKey string) *v1.ConfigMap {
 	var data = make(map[string][]byte)
-	data[customBrandImageKey] = []byte("iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAADmklEQVR4Xu2bv0tyURzGv1KLDoUgLoIShEODDbaHf0JbuNfSkIlR2NAf4NTgoJtQkoODq4OWlVu0NUWzoERQpmDhywm6vJh6L3bu5SmeM8bx3Od+Pvfx/jLX9vb2UDhgCLgoBMbFZxAKwfJBIWA+KIRC0AiA5eE5hELACIDFYUMoBIwAWBw2hELACIDFYUMoBIwAWBw2hELACIDFYUMoBIwAWBw2hELACIDFYUMoBIwAWBw25C8I8Xg8srCwYOxKp9OR9/d3LbvmdrtlcXHRlrW1BLR5kZkacnR0JMFg0IhWq9WkVCppiXp4eChLS0vGWpeXl1IsFrWs/RsW0SKkXq/L+fm5lv0dFXJ1dSWnp6da1v4Ni1AImCUKoZDpBKLRqKysrBiTbm5u5PHxEQybfXHgGmLfrv6OlSkEzJN2IaFQSFZXVyUcDovX65XX11d5enoSdbV0f39vuvt+v18CgYAx7+HhQV5eXkw/91cmaBNyfX0tqVRK1I3dpPH29ibZbFYU5EmDl70z/MPO6I1hu90Wn88nLpfL9EAdDoeSy+Xk7u5u7FwK0SBkHNmPjw+Zm5sbC30wGEgikRj7uIVCNApRR//FxYVUKhXp9XoyPz8vsVhMNjY2vskpFArSbDa/CaMQTUKmfRWp517qa+7/oU7wJycnFDJCQMtJXa2pHi6qh4yTRjqdFnUF9jVarZYcHx9TiB1C+v2+7O7uTj2hb25ufn59fY3n52c5ODigEDuEqMvYTCYzVcj6+rrE43FjTrfblWQySSF2CLm9vZV8Pj9VyNrammxtbRlz1D3J3t4ehdghpNFoyNnZGYWY3oWZT9ByUrfygooNMZehZlCINU6OzaIQx1Bb2xCFWOPk2CwKcQy1tQ1RiDVOjs2iEMdQW9sQhVjj5NgsCnEMtbUNUYg1To7NmknI6EukarUq5XJ5auhIJCI7OzvGHPXDBfUOfnTs7+/L8vKy8Wedvxt2jOoPNjSTkB9sjx81IUAhYIcIhVAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhoAJ+QeTS82niTWiVwAAAABJRU5ErkJggg==")
+	data[imageKey] = []byte("iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAADmklEQVR4Xu2bv0tyURzGv1KLDoUgLoIShEODDbaHf0JbuNfSkIlR2NAf4NTgoJtQkoODq4OWlVu0NUWzoERQpmDhywm6vJh6L3bu5SmeM8bx3Od+Pvfx/jLX9vb2UDhgCLgoBMbFZxAKwfJBIWA+KIRC0AiA5eE5hELACIDFYUMoBIwAWBw2hELACIDFYUMoBIwAWBw2hELACIDFYUMoBIwAWBw2hELACIDFYUMoBIwAWBw25C8I8Xg8srCwYOxKp9OR9/d3LbvmdrtlcXHRlrW1BLR5kZkacnR0JMFg0IhWq9WkVCppiXp4eChLS0vGWpeXl1IsFrWs/RsW0SKkXq/L+fm5lv0dFXJ1dSWnp6da1v4Ni1AImCUKoZDpBKLRqKysrBiTbm5u5PHxEQybfXHgGmLfrv6OlSkEzJN2IaFQSFZXVyUcDovX65XX11d5enoSdbV0f39vuvt+v18CgYAx7+HhQV5eXkw/91cmaBNyfX0tqVRK1I3dpPH29ibZbFYU5EmDl70z/MPO6I1hu90Wn88nLpfL9EAdDoeSy+Xk7u5u7FwK0SBkHNmPjw+Zm5sbC30wGEgikRj7uIVCNApRR//FxYVUKhXp9XoyPz8vsVhMNjY2vskpFArSbDa/CaMQTUKmfRWp517qa+7/oU7wJycnFDJCQMtJXa2pHi6qh4yTRjqdFnUF9jVarZYcHx9TiB1C+v2+7O7uTj2hb25ufn59fY3n52c5ODigEDuEqMvYTCYzVcj6+rrE43FjTrfblWQySSF2CLm9vZV8Pj9VyNrammxtbRlz1D3J3t4ehdghpNFoyNnZGYWY3oWZT9ByUrfygooNMZehZlCINU6OzaIQx1Bb2xCFWOPk2CwKcQy1tQ1RiDVOjs2iEMdQW9sQhVjj5NgsCnEMtbUNUYg1To7NmknI6EukarUq5XJ5auhIJCI7OzvGHPXDBfUOfnTs7+/L8vKy8Wedvxt2jOoPNjSTkB9sjx81IUAhYIcIhVAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhlAIGAGwOGwIhYARAIvDhoAJ+QeTS82niTWiVwAAAABJRU5ErkJggg==")
 
 	cm := &v1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
@@ -168,12 +182,20 @@ func createLogoConfigMap(client *testframework.Clientset) (*v1.ConfigMap, error)
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              customBrandConfigMapName,
-			Namespace:         "openshift-config",
+			Name:              configMapName,
+			Namespace:         consoleapi.OpenShiftConfigNamespace,
 			CreationTimestamp: metav1.Time{},
 		},
 		BinaryData: data,
 	}
-	return client.ConfigMaps("openshift-config").Create(cm)
+	return cm
+}
 
+func createCustomLogoConfigMap(client *framework.ClientSet, configMapName string, imageKey string) (*v1.ConfigMap, error) {
+	return client.Core.ConfigMaps(consoleapi.OpenShiftConfigNamespace).Create(customLogoConfigmap(configMapName, imageKey))
+}
+
+func deleteCustomLogoConfigMap(client *framework.ClientSet, configMapName string) (*v1.ConfigMap, error) {
+	imageKey := "irrelevant"
+	return client.Core.ConfigMaps(consoleapi.OpenShiftConfigNamespace).Create(customLogoConfigmap(configMapName, imageKey))
 }
