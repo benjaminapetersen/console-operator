@@ -20,47 +20,42 @@ func cleanupManagedTestCase(t *testing.T, client *framework.ClientSet) {
 // resources and verifies that the operator recreates them.
 func TestManaged(t *testing.T) {
 	client, _ := setupManagedTestCase(t)
-	defer framework.MustManageConsole(t, client)
+	defer cleanupManagedTestCase(t, client)
 	framework.DeleteAll(t, client)
 
 	t.Logf("validating that the operator recreates resources when ManagementState:Managed...")
-
 	err := framework.ConsoleResourcesAvailable(client)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cleanupManagedTestCase(t, client)
 }
 
 func TestEditManagedConfigMap(t *testing.T) {
 	client, _ := setupManagedTestCase(t)
-	defer framework.MustManageConsole(t, client)
+	defer cleanupManagedTestCase(t, client)
 
 	err := patchAndCheckConfigMap(t, client, true)
 	if err != nil {
 		t.Fatalf("error: %s", err)
 	}
-	cleanupManagedTestCase(t, client)
 }
 
 func TestEditManagedService(t *testing.T) {
 	client, _ := setupManagedTestCase(t)
-	defer framework.MustManageConsole(t, client)
+	defer cleanupManagedTestCase(t, client)
 
 	err := patchAndCheckService(t, client, true)
 	if err != nil {
 		t.Fatalf("error: %s", err)
 	}
-	cleanupManagedTestCase(t, client)
 }
 
 func TestEditManagedRoute(t *testing.T) {
 	client, _ := setupManagedTestCase(t)
-	defer framework.MustManageConsole(t, client)
+	defer cleanupManagedTestCase(t, client)
 
 	err := patchAndCheckRoute(t, client, true)
 	if err != nil {
 		t.Fatalf("error: %s", err)
 	}
-	cleanupManagedTestCase(t, client)
 }

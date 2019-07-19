@@ -20,8 +20,7 @@ const (
 )
 
 func setupProvidersTestCase(t *testing.T) (*framework.ClientSet, *operatorsv1.Console) {
-	client, operatorConfig := framework.StandardSetup(t)
-	return client, operatorConfig
+	return framework.StandardSetup(t)
 }
 
 func cleanupProvidersTestCase(t *testing.T, client *framework.ClientSet) {
@@ -29,10 +28,10 @@ func cleanupProvidersTestCase(t *testing.T, client *framework.ClientSet) {
 }
 
 func TestProvidersSetStatuspageID(t *testing.T) {
-	client, _ := setupProvidersTestCase(t)
-	defer cleanupProvidersTestCase(t, client)
 	expectedStatuspageID := "id-1234"
 	currentStatuspageID := ""
+	client, _ := setupProvidersTestCase(t)
+	defer cleanupProvidersTestCase(t, client)
 	setOperatorConfigStatuspageIDProvider(t, client, expectedStatuspageID)
 
 	err := wait.Poll(1*time.Second, pollTimeout, func() (stop bool, err error) {
@@ -68,11 +67,11 @@ func TestProvidersSetStatuspageIDFlag(t *testing.T) {
 }
 
 func TestProvidersSetStatuspageIDEmpty(t *testing.T) {
-	client, _ := setupProvidersTestCase(t)
-	defer cleanupProvidersTestCase(t, client)
 	statuspageID := ""
 	currentProviders := ""
 	expectedProviders := "{}"
+	client, _ := setupProvidersTestCase(t)
+	defer cleanupProvidersTestCase(t, client)
 	setOperatorConfigStatuspageIDProvider(t, client, statuspageID)
 
 	err := wait.Poll(1*time.Second, pollTimeout, func() (stop bool, err error) {

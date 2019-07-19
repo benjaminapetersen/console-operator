@@ -47,7 +47,7 @@ func cleanupBrandingTestCase(t *testing.T, client *framework.ClientSet, original
 	if err != nil {
 		t.Fatalf("could not reset managed config map  %v", err)
 	}
-	framework.WaitForSettledState(t, client)
+	framework.StandardCleanup(t, client)
 }
 
 // TestOperatorConfigBranding() tests that changing the brand value on the operator-config

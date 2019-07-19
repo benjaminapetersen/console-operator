@@ -38,12 +38,15 @@ func cleanupCustomBrandTest(t *testing.T, client *framework.ClientSet) {
 // Implicitly it ensures that the operator-config customization overrides customization set on
 // console-config in openshift-config-managed, if the managed configmap exists.
 func TestCustomBrand(t *testing.T) {
-	client, operatorConfig := setupCustomBrandTest(t)
-
 	// create a configmap with the new logo
 	customProductName := "custom name"
 	customLogoConfigMapName := "custom-logo"
 	customLogoFileName := "pic.png"
+
+	client, operatorConfig := setupCustomBrandTest(t)
+	// cleanup
+	defer deleteCustomLogoConfigMap(client, customLogoConfigMapName)
+	defer cleanupCustomBrandTest(t, client)
 
 	_, err := createCustomLogoConfigMap(client, customLogoConfigMapName, customLogoFileName)
 	if err != nil && !apiErrors.IsAlreadyExists(err) {
@@ -99,7 +102,7 @@ func TestCustomBrand(t *testing.T) {
 		t.Fatalf("error: customization values not on deployment, %v", err)
 	}
 
-	// remove the custom logo from the operator config
+	// remove the custom logo from the operator config so we can verify that the configmap is cleaned up
 	operatorConfigWithoutCustomLogo := operatorConfigWithCustomLogo.DeepCopy()
 	operatorConfigWithoutCustomLogo.Spec.Customization = operatorsv1.ConsoleCustomization{}
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -125,11 +128,6 @@ func TestCustomBrand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("configmap custom-logo not found in openshift-console")
 	}
-
-	deleteCustomLogoConfigMap(client, customLogoConfigMapName)
-
-	// Final line: cleanup after ourselves
-	cleanupCustomBrandTest(t, client)
 }
 
 func hasCustomBranding(cm *v1.ConfigMap, desiredProductName string, desiredLogoFileName string) bool {
