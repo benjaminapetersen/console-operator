@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/client-go/util/retry"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -13,21 +15,40 @@ import (
 	consoleapi "github.com/openshift/console-operator/pkg/api"
 )
 
+// func that ensures a clean slate before a test runs.
+// setup is more aggressive than cleanup as the request for
+// a clean slate on setup is assertive, not courtesy
 func StandardSetup(t *testing.T) (*ClientSet, *operatorsv1.Console) {
+	t.Helper()
 	client := MustNewClientset(t, nil)
-	operatorConfig := MustPristine(t, client)
+	operatorConfig := &operatorsv1.Console{}
+
+	// we want to be certain that
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		conf, err := Pristine(t, client)
+		operatorConfig = conf // fix shadowing
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	WaitForSettledState(t, client)
+
 	return client, operatorConfig
 }
 
+// courtesy func to return state to something reasonable before
+// the next test runs
 func StandardCleanup(t *testing.T, client *ClientSet) {
-	MustPristine(t, client)
+	t.Helper()
+	_ = MustPristine(t, client)
 	WaitForSettledState(t, client)
 }
 
 // set the operator config to a pristine state to start a next round of tests
 // this should by default nullify out any customizations a user sets
 func Pristine(t *testing.T, client *ClientSet) (*operatorsv1.Console, error) {
+	t.Helper()
 	operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -43,6 +64,7 @@ func Pristine(t *testing.T, client *ClientSet) (*operatorsv1.Console, error) {
 }
 
 func MustPristine(t *testing.T, client *ClientSet) *operatorsv1.Console {
+	t.Helper()
 	operatorConfig, err := Pristine(t, client)
 	if err != nil {
 		t.Fatal(err)
@@ -65,6 +87,7 @@ func isOperatorRemoved(cr *operatorsv1.Console) bool {
 type operatorStateReactionFn func(cr *operatorsv1.Console) bool
 
 func ensureConsoleIsInDesiredState(t *testing.T, client *ClientSet, state operatorsv1.ManagementState) error {
+	t.Helper()
 	var operatorConfig *operatorsv1.Console
 	// var checkFunc func()
 	var checkFunc operatorStateReactionFn
@@ -94,6 +117,7 @@ func ensureConsoleIsInDesiredState(t *testing.T, client *ClientSet, state operat
 }
 
 func ManageConsole(t *testing.T, client *ClientSet) error {
+	t.Helper()
 	operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -123,6 +147,7 @@ func ManageConsole(t *testing.T, client *ClientSet) error {
 }
 
 func UnmanageConsole(t *testing.T, client *ClientSet) error {
+	t.Helper()
 	operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -147,6 +172,7 @@ func UnmanageConsole(t *testing.T, client *ClientSet) error {
 }
 
 func RemoveConsole(t *testing.T, client *ClientSet) error {
+	t.Helper()
 	operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -170,6 +196,7 @@ func RemoveConsole(t *testing.T, client *ClientSet) error {
 	return nil
 }
 func MustManageConsole(t *testing.T, client *ClientSet) error {
+	t.Helper()
 	if err := ManageConsole(t, client); err != nil {
 		t.Fatal(err)
 	}
@@ -177,6 +204,7 @@ func MustManageConsole(t *testing.T, client *ClientSet) error {
 }
 
 func MustUnmanageConsole(t *testing.T, client *ClientSet) error {
+	t.Helper()
 	if err := UnmanageConsole(t, client); err != nil {
 		t.Fatal(err)
 	}
@@ -184,6 +212,7 @@ func MustUnmanageConsole(t *testing.T, client *ClientSet) error {
 }
 
 func MustRemoveConsole(t *testing.T, client *ClientSet) error {
+	t.Helper()
 	if err := RemoveConsole(t, client); err != nil {
 		t.Fatal(err)
 	}
@@ -191,6 +220,7 @@ func MustRemoveConsole(t *testing.T, client *ClientSet) error {
 }
 
 func MustNormalLogLevel(t *testing.T, client *ClientSet) error {
+	t.Helper()
 	operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -207,6 +237,7 @@ func MustNormalLogLevel(t *testing.T, client *ClientSet) error {
 }
 
 func SetLogLevel(t *testing.T, client *ClientSet, logLevel operatorsv1.LogLevel) error {
+	t.Helper()
 	operatorConfig, err := client.Operator.Consoles().Get(consoleapi.ConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -280,6 +311,8 @@ func operatorIsSettled(operatorConfig *operatorsv1.Console) bool {
 // A helper to ensure our operator config reaches a settled state before we
 // begin the next test.
 func WaitForSettledState(t *testing.T, client *ClientSet) (settled bool, err error) {
+	t.Helper()
+	fmt.Printf("waiting to reach settled state...\n")
 	interval := 1 * time.Second
 	// it should never take this long for a test to pass
 	max := 240 * time.Second
