@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/client-go/util/retry"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -137,7 +139,12 @@ func setOperatorConfigStatuspageIDProvider(t *testing.T, client *framework.Clien
 			},
 		},
 	}
-	_, err = client.Operator.Consoles().Update(operatorConfig)
+
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		_, err = client.Operator.Consoles().Update(operatorConfig)
+		return err
+	})
+
 	if err != nil {
 		t.Fatalf("could not update operator config providers statupageID: %v", err)
 	}
