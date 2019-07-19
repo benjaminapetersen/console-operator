@@ -16,11 +16,12 @@ import (
 // ClientSet is a set of Kubernetes clients.
 type ClientSet struct {
 	// embedded
-	Core     clientcorev1.CoreV1Interface
-	Apps     clientappsv1.AppsV1Interface
-	Routes   clientroutev1.RouteV1Interface
-	Operator operatorclientv1.ConsolesGetter
-	Console  configv1.ConsolesGetter
+	Core            clientcorev1.CoreV1Interface
+	Apps            clientappsv1.AppsV1Interface
+	Routes          clientroutev1.RouteV1Interface
+	Operator        operatorclientv1.ConsolesGetter
+	Console         configv1.ConsolesGetter
+	ClusterOperator configv1.ClusterOperatorsGetter
 }
 
 // NewClientset creates a set of Kubernetes clients. The default kubeconfig is
@@ -52,6 +53,13 @@ func NewClientset(kubeconfig *restclient.Config) (*ClientSet, error) {
 		return nil, err
 	}
 	clientset.Operator = operatorsClient
+
+	configClient, err := configv1.NewForConfig(kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+	clientset.Console = configClient
+	clientset.ClusterOperator = configClient
 
 	return clientset, nil
 }
