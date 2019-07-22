@@ -49,8 +49,8 @@ func TestProvidersSetStatuspageID(t *testing.T) {
 }
 
 func TestProvidersSetStatuspageIDFlag(t *testing.T) {
-	client, originalOperatorConfigSpec := setupProvidersTestCase(t)
-	defer cleanupProvidersTestCase(t, client, originalOperatorConfigSpec)
+	client, _ := setupProvidersTestCase(t)
+	defer cleanupProvidersTestCase(t, client)
 	expectedStatuspageID := "id-1234"
 	expectedStatuspageFlag := fmt.Sprintf("--statuspage-id=%s", expectedStatuspageID)
 	currentStatuspageFlag := ""
