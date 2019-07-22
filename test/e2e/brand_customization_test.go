@@ -27,16 +27,35 @@ const (
 	customLogoMountPath  = "/var/logo/"
 )
 
-func setupCustomBrandTest(t *testing.T, cmName string) (*framework.ClientSet, *operatorsv1.Console) {
+func setupCustomBrandTest(t *testing.T, cmName string, fileName string) (*framework.ClientSet, *operatorsv1.Console) {
 	clientSet, operatorConfig := framework.StandardSetup(t)
 	// ensure it doesn't exist already for some reason
-	deleteCustomLogoConfigMap(clientSet, cmName)
+	err := deleteCustomLogoConfigMap(clientSet, cmName)
+	if err != nil {
+		t.Fatalf("could not cleanup previous custom logo configmap, %v", err)
+	}
+	_, err = createCustomLogoConfigMap(clientSet, cmName, fileName)
+	if err != nil && !apiErrors.IsAlreadyExists(err) {
+		t.Fatalf("could not create custom logo configmap, %v", err)
+	}
+
 	return clientSet, operatorConfig
 }
-func cleanupCustomBrandTest(t *testing.T, client *framework.ClientSet) {
+func cleanupCustomBrandTest(t *testing.T, client *framework.ClientSet, cmName string) {
+	err := deleteCustomLogoConfigMap(client, cmName)
+	if err != nil {
+		t.Fatalf("could not delete custom logo configmap, %v", err)
+	}
 	framework.StandardCleanup(t, client)
 }
 
+// TODO: consider break this into several different tests.
+// - setup should be same setup across them
+// - check for just one thing
+// - call cleanup
+// - too many things in series here, probably
+//
+//
 // TestBrandCustomization() tests that changing the customization values on the operator-config
 // will result in the customization being set on the console-config in openshift-console.
 // Implicitly it ensures that the operator-config customization overrides customization set on
@@ -47,23 +66,18 @@ func TestCustomBrand(t *testing.T) {
 	customLogoConfigMapName := "custom-logo"
 	customLogoFileName := "pic.png"
 	pollFrequency := 1 * time.Second
-	pollStandardMax := 20 * time.Second // TODO: maybe longer is all that was needed.
+	pollStandardMax := 30 * time.Second // TODO: maybe longer is all that was needed.
 	pollLongMax := 120 * time.Second
 
-	client, operatorConfig := setupCustomBrandTest(t, customLogoConfigMapName)
+	client, operatorConfig := setupCustomBrandTest(t, customLogoConfigMapName, customLogoFileName)
 	// cleanup, defer deletion of the configmap to ensure it happens even if another part of the test fails
-	defer deleteCustomLogoConfigMap(client, customLogoConfigMapName)
-	defer cleanupCustomBrandTest(t, client)
-
-	_, err := createCustomLogoConfigMap(client, customLogoConfigMapName, customLogoFileName)
-	if err != nil && !apiErrors.IsAlreadyExists(err) {
-		t.Fatalf("could not create custom logo configmap, %v", err)
-	}
+	defer cleanupCustomBrandTest(t, client, customLogoConfigMapName)
 
 	// update the operator config with custom branding
 	operatorConfigWithCustomLogo := withCustomBrand(*operatorConfig, customProductName, customLogoConfigMapName, customLogoFileName)
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		operatorConfigWithCustomLogo, err = client.Operator.Consoles().Update(operatorConfigWithCustomLogo)
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		updatedConfig, err := client.Operator.Consoles().Update(operatorConfigWithCustomLogo)
+		operatorConfigWithCustomLogo = updatedConfig // shadowing
 		return err
 	})
 	if err != nil {
@@ -113,7 +127,7 @@ func TestCustomBrand(t *testing.T) {
 
 	// TODO: errors here
 	operatorConfigWithoutCustomLogo.Spec.Customization = operatorsv1.ConsoleCustomization{
-		CustomLogoFile: nil,
+		// CustomLogoFile: nil,
 	}
 
 	// TODO: delete this extra logging
