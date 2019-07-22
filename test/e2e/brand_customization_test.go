@@ -26,8 +26,11 @@ const (
 	customLogoMountPath  = "/var/logo/"
 )
 
-func setupCustomBrandTest(t *testing.T) (*framework.ClientSet, *operatorsv1.Console) {
-	return framework.StandardSetup(t)
+func setupCustomBrandTest(t *testing.T, cmName string) (*framework.ClientSet, *operatorsv1.Console) {
+	clientSet, operatorConfig := framework.StandardSetup(t)
+	// ensure it doesn't exist already for some reason
+	deleteCustomLogoConfigMap(clientSet, cmName)
+	return clientSet, operatorConfig
 }
 func cleanupCustomBrandTest(t *testing.T, client *framework.ClientSet) {
 	framework.StandardCleanup(t, client)
@@ -43,8 +46,8 @@ func TestCustomBrand(t *testing.T) {
 	customLogoConfigMapName := "custom-logo"
 	customLogoFileName := "pic.png"
 
-	client, operatorConfig := setupCustomBrandTest(t)
-	// cleanup
+	client, operatorConfig := setupCustomBrandTest(t, customLogoConfigMapName)
+	// cleanup, defer deletion of the configmap to ensure it happens even if another part of the test fails
 	defer deleteCustomLogoConfigMap(client, customLogoConfigMapName)
 	defer cleanupCustomBrandTest(t, client)
 
@@ -104,14 +107,18 @@ func TestCustomBrand(t *testing.T) {
 
 	// remove the custom logo from the operator config so we can verify that the configmap is cleaned up
 	operatorConfigWithoutCustomLogo := operatorConfigWithCustomLogo.DeepCopy()
-	operatorConfigWithoutCustomLogo.Spec.Customization = operatorsv1.ConsoleCustomization{}
+
+	// TODO: errors here
+	operatorConfigWithoutCustomLogo.Spec.Customization = operatorsv1.ConsoleCustomization{
+		CustomLogoFile: nil,
+	}
+
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		operatorConfigWithoutCustomLogo, err = client.Operator.Consoles().Update(operatorConfigWithoutCustomLogo)
 		return err
 	})
 	if err != nil {
 		t.Fatalf("could not clear customizations from operator config: %v", err)
-
 	}
 
 	// ensure that the custom-logo configmap in openshift-console has been removed
@@ -193,7 +200,6 @@ func createCustomLogoConfigMap(client *framework.ClientSet, configMapName string
 	return client.Core.ConfigMaps(consoleapi.OpenShiftConfigNamespace).Create(customLogoConfigmap(configMapName, imageKey))
 }
 
-func deleteCustomLogoConfigMap(client *framework.ClientSet, configMapName string) (*v1.ConfigMap, error) {
-	imageKey := "irrelevant"
-	return client.Core.ConfigMaps(consoleapi.OpenShiftConfigNamespace).Create(customLogoConfigmap(configMapName, imageKey))
+func deleteCustomLogoConfigMap(client *framework.ClientSet, configMapName string) error {
+	return client.Core.ConfigMaps(consoleapi.OpenShiftConfigNamespace).Delete(configMapName, &metav1.DeleteOptions{})
 }
