@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/client-go/util/retry"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -14,36 +12,6 @@ import (
 	operatorsv1 "github.com/openshift/api/operator/v1"
 	consoleapi "github.com/openshift/console-operator/pkg/api"
 )
-
-// func that ensures a clean slate before a test runs.
-// setup is more aggressive than cleanup as the request for
-// a clean slate on setup is assertive, not courtesy
-func StandardSetup(t *testing.T) (*ClientSet, *operatorsv1.Console) {
-	t.Helper()
-	client := MustNewClientset(t, nil)
-	operatorConfig := &operatorsv1.Console{}
-
-	// we want to be certain that
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		conf, err := Pristine(t, client)
-		operatorConfig = conf // fix shadowing
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	WaitForSettledState(t, client)
-
-	return client, operatorConfig
-}
-
-// courtesy func to return state to something reasonable before
-// the next test runs
-func StandardCleanup(t *testing.T, client *ClientSet) {
-	t.Helper()
-	_ = MustPristine(t, client)
-	WaitForSettledState(t, client)
-}
 
 // set the operator config to a pristine state to start a next round of tests
 // this should by default nullify out any customizations a user sets
