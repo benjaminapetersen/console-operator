@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -45,6 +46,9 @@ func TestCustomBrand(t *testing.T) {
 	customProductName := "custom name"
 	customLogoConfigMapName := "custom-logo"
 	customLogoFileName := "pic.png"
+	pollFrequency := 1 * time.Second
+	pollStandardMax := 20 * time.Second // TODO: maybe longer is all that was needed.
+	pollLongMax := 120 * time.Second
 
 	client, operatorConfig := setupCustomBrandTest(t, customLogoConfigMapName)
 	// cleanup, defer deletion of the configmap to ensure it happens even if another part of the test fails
@@ -67,7 +71,7 @@ func TestCustomBrand(t *testing.T) {
 	}
 
 	// check console-config in openshift-console and verify the config has made it through
-	err = wait.Poll(1*time.Second, 10*time.Second, func() (stop bool, err error) {
+	err = wait.Poll(pollFrequency, pollStandardMax, func() (stop bool, err error) {
 		cm, err := framework.GetConsoleConfigMap(client)
 		if hasCustomBranding(cm, customProductName, customLogoFileName) {
 			return true, nil
@@ -79,7 +83,7 @@ func TestCustomBrand(t *testing.T) {
 	}
 
 	// ensure that custom-logo in openshift-console has been created
-	err = wait.Poll(1*time.Second, 10*time.Second, func() (stop bool, err error) {
+	err = wait.Poll(pollFrequency, pollStandardMax, func() (stop bool, err error) {
 		_, err = framework.GetCustomLogoConfigMap(client)
 		if apiErrors.IsNotFound(err) {
 			return false, nil
@@ -94,8 +98,7 @@ func TestCustomBrand(t *testing.T) {
 	}
 
 	// ensure the volume mounts have been added to the deployment
-	longPollTimeout := 120 * time.Second
-	err = wait.Poll(1*time.Second, longPollTimeout, func() (stop bool, err error) {
+	err = wait.Poll(pollFrequency, pollLongMax, func() (stop bool, err error) {
 		deployment, err := framework.GetConsoleDeployment(client)
 		volume := findCustomLogoVolume(deployment)
 		volumeMount := findCustomLogoVolumeMount(deployment)
@@ -113,16 +116,24 @@ func TestCustomBrand(t *testing.T) {
 		CustomLogoFile: nil,
 	}
 
+	// TODO: delete this extra logging
+	toLog, _ := json.Marshal(operatorConfigWithoutCustomLogo)
+	t.Logf("before: %v", string(toLog))
+
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		operatorConfigWithoutCustomLogo, err = client.Operator.Consoles().Update(operatorConfigWithoutCustomLogo)
 		return err
 	})
 	if err != nil {
+		// TODO: delete this extra logging
+		toLog, _ := json.Marshal(operatorConfigWithoutCustomLogo)
+		t.Logf("after: %v", string(toLog))
+
 		t.Fatalf("could not clear customizations from operator config: %v", err)
 	}
 
 	// ensure that the custom-logo configmap in openshift-console has been removed
-	err = wait.Poll(1*time.Second, 10*time.Second, func() (stop bool, err error) {
+	err = wait.Poll(pollFrequency, pollStandardMax, func() (stop bool, err error) {
 		_, err = framework.GetCustomLogoConfigMap(client)
 		if apiErrors.IsNotFound(err) {
 			return true, nil
