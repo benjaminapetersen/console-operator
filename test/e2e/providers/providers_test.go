@@ -1,7 +1,8 @@
-package e2e
+package providers
 
 import (
 	"fmt"
+	"github.com/openshift/console-operator/test/e2e"
 	"strings"
 	"testing"
 	"time"
@@ -36,7 +37,7 @@ func TestProvidersSetStatuspageID(t *testing.T) {
 	defer cleanupProvidersTestCase(t, client)
 	setOperatorConfigStatuspageIDProvider(t, client, expectedStatuspageID)
 
-	err := wait.Poll(1*time.Second, pollTimeout, func() (stop bool, err error) {
+	err := wait.Poll(1*time.Second, e2e.pollTimeout, func() (stop bool, err error) {
 		currentStatuspageID = getConsoleProviderField(t, client, statuspageIDField)
 		if expectedStatuspageID == currentStatuspageID {
 			return true, nil
@@ -56,7 +57,7 @@ func TestProvidersSetStatuspageIDFlag(t *testing.T) {
 	currentStatuspageFlag := ""
 	setOperatorConfigStatuspageIDProvider(t, client, expectedStatuspageID)
 
-	err := wait.Poll(1*time.Second, pollTimeout, func() (stop bool, err error) {
+	err := wait.Poll(1*time.Second, e2e.pollTimeout, func() (stop bool, err error) {
 		currentStatuspageFlag = getConsoleDeploymentCommand(t, client)
 		if expectedStatuspageFlag == currentStatuspageFlag {
 			return true, nil
@@ -76,7 +77,7 @@ func TestProvidersSetStatuspageIDEmpty(t *testing.T) {
 	defer cleanupProvidersTestCase(t, client)
 	setOperatorConfigStatuspageIDProvider(t, client, statuspageID)
 
-	err := wait.Poll(1*time.Second, pollTimeout, func() (stop bool, err error) {
+	err := wait.Poll(1*time.Second, e2e.pollTimeout, func() (stop bool, err error) {
 		currentProviders = getConsoleProviderField(t, client, providersField)
 		if currentProviders == expectedProviders {
 			return true, nil

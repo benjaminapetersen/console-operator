@@ -1,4 +1,4 @@
-package e2e
+package framework
 
 import (
 	"reflect"
@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	consoleapi "github.com/openshift/console-operator/pkg/api"
-	"github.com/openshift/console-operator/test/e2e/framework"
 )
 
 // Each of these tests helpers are similar, they only vary in the
@@ -20,9 +19,9 @@ import (
 // In case the console-operator is Unmanaged state the patched data should
 // be equal to the one obtained after patch is applied.
 
-var pollTimeout = 10 * time.Second
+var PollTimeout = 10 * time.Second
 
-func patchAndCheckConfigMap(t *testing.T, client *framework.ClientSet, isOperatorManaged bool) error {
+func PatchAndCheckConfigMap(t *testing.T, client *ClientSet, isOperatorManaged bool) error {
 	t.Logf("patching Data on the console ConfigMap")
 	configMap, err := client.Core.ConfigMaps(consoleapi.OpenShiftConsoleNamespace).Patch(consoleapi.OpenShiftConsoleConfigMapName, types.MergePatchType, []byte(`{"data": {"console-config.yaml": "test"}}`))
 	if err != nil {
@@ -31,8 +30,8 @@ func patchAndCheckConfigMap(t *testing.T, client *framework.ClientSet, isOperato
 	patchedData := configMap.Data
 
 	t.Logf("polling for patched Data on the console ConfigMap")
-	err = wait.Poll(1*time.Second, pollTimeout, func() (stop bool, err error) {
-		configMap, err = framework.GetConsoleConfigMap(client)
+	err = wait.Poll(1*time.Second, PollTimeout, func() (stop bool, err error) {
+		configMap, err = GetConsoleConfigMap(client)
 		if err != nil {
 			return true, err
 		}
@@ -45,7 +44,7 @@ func patchAndCheckConfigMap(t *testing.T, client *framework.ClientSet, isOperato
 	return err
 }
 
-func patchAndCheckService(t *testing.T, client *framework.ClientSet, isOperatorManaged bool) error {
+func PatchAndCheckService(t *testing.T, client *ClientSet, isOperatorManaged bool) error {
 	t.Logf("patching Annotation on the console Service")
 	service, err := client.Core.Services(consoleapi.OpenShiftConsoleNamespace).Patch(consoleapi.OpenShiftConsoleServiceName, types.MergePatchType, []byte(`{"metadata": {"annotations": {"service.alpha.openshift.io/serving-cert-secret-name": "test"}}}`))
 	if err != nil {
@@ -54,8 +53,8 @@ func patchAndCheckService(t *testing.T, client *framework.ClientSet, isOperatorM
 	patchedData := service.GetAnnotations()
 
 	t.Logf("polling for patched Annotation on the console Service")
-	err = wait.Poll(1*time.Second, pollTimeout, func() (stop bool, err error) {
-		service, err = framework.GetConsoleService(client)
+	err = wait.Poll(1*time.Second, PollTimeout, func() (stop bool, err error) {
+		service, err = GetConsoleService(client)
 		if err != nil {
 			return true, err
 		}
@@ -68,7 +67,7 @@ func patchAndCheckService(t *testing.T, client *framework.ClientSet, isOperatorM
 	return err
 }
 
-func patchAndCheckRoute(t *testing.T, client *framework.ClientSet, isOperatorManaged bool) error {
+func PatchAndCheckRoute(t *testing.T, client *ClientSet, isOperatorManaged bool) error {
 	t.Logf("patching TargetPort on the console Route")
 	route, err := client.Routes.Routes(consoleapi.OpenShiftConsoleNamespace).Patch(consoleapi.OpenShiftConsoleRouteName, types.MergePatchType, []byte(`{"spec": {"port": {"targetPort": "http"}}}`))
 	if err != nil {
@@ -77,8 +76,8 @@ func patchAndCheckRoute(t *testing.T, client *framework.ClientSet, isOperatorMan
 	patchedData := route.Spec.Port.TargetPort
 
 	t.Logf("polling for patched TargetPort on the console Route")
-	err = wait.Poll(1*time.Second, pollTimeout, func() (stop bool, err error) {
-		route, err = framework.GetConsoleRoute(client)
+	err = wait.Poll(1*time.Second, PollTimeout, func() (stop bool, err error) {
+		route, err = GetConsoleRoute(client)
 		if err != nil {
 			return true, err
 		}

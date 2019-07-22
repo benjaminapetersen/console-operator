@@ -1,6 +1,7 @@
-package e2e
+package management_state
 
 import (
+	"github.com/openshift/console-operator/test/e2e"
 	"testing"
 
 	"github.com/openshift/console-operator/test/e2e/framework"
@@ -34,7 +35,7 @@ func TestEditUnmanagedConfigMap(t *testing.T) {
 	client := setupUnmanagedTestCase(t)
 	defer cleanUpUnmanagedTestCase(t, client)
 
-	err := patchAndCheckConfigMap(t, client, false)
+	err := e2e.patchAndCheckConfigMap(t, client, false)
 	if err != nil {
 		t.Fatalf("error: %s", err)
 	}
@@ -44,7 +45,7 @@ func TestEditUnmanagedService(t *testing.T) {
 	client := setupUnmanagedTestCase(t)
 	defer cleanUpUnmanagedTestCase(t, client)
 
-	err := patchAndCheckService(t, client, false)
+	err := e2e.patchAndCheckService(t, client, false)
 	if err != nil {
 		t.Fatalf("error: %s", err)
 	}
@@ -54,7 +55,7 @@ func TestEditUnmanagedRoute(t *testing.T) {
 	client := setupUnmanagedTestCase(t)
 	defer cleanUpUnmanagedTestCase(t, client)
 
-	err := patchAndCheckRoute(t, client, false)
+	err := e2e.patchAndCheckRoute(t, client, false)
 	if err != nil {
 		t.Fatalf("error: %s", err)
 	}

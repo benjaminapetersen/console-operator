@@ -1,4 +1,4 @@
-package e2e
+package management_state
 
 import (
 	"testing"

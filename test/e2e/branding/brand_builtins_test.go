@@ -1,7 +1,8 @@
-package e2e
+package branding
 
 import (
 	"fmt"
+	"github.com/openshift/console-operator/test/e2e"
 	"strings"
 	"testing"
 	"time"
@@ -99,7 +100,7 @@ func TestBrandingFromManagedConfigMap(t *testing.T) {
 			t.Fatalf("error: could not apply managed config map %v", err)
 		}
 
-		err = wait.Poll(1*time.Second, pollTimeout, func() (stop bool, err error) {
+		err = wait.Poll(1*time.Second, e2e.pollTimeout, func() (stop bool, err error) {
 			gotBrand := getConsoleBrand(t, client)
 			return (gotBrand == expectedBrand), nil
 		})
