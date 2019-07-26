@@ -5,6 +5,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/openshift/library-go/pkg/operator/staleconditions"
+
 	// kube
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -174,6 +176,19 @@ func RunOperator(ctx *controllercmd.ControllerContext) error {
 		ctx.EventRecorder,
 	)
 
+	staleConditionsController := staleconditions.NewRemoveStaleConditions(
+		[]string{
+			// in 4.1.0 we directly set this set of conditions. We no longer do this.
+			// These can be removed in 4.3.0+
+			"Available",
+			"Progressing",
+			"Degraded",
+			"Failing",
+		},
+		operatorClient,
+		ctx.EventRecorder,
+	)
+
 	configUpgradeableController := unsupportedconfigoverridescontroller.NewUnsupportedConfigOverridesController(operatorClient, ctx.EventRecorder)
 
 	for _, informer := range []interface {
@@ -194,6 +209,7 @@ func RunOperator(ctx *controllercmd.ControllerContext) error {
 	go resourceSyncer.Run(1, ctx.Done())
 	go clusterOperatorStatus.Run(1, ctx.Done())
 	go configUpgradeableController.Run(1, ctx.Done())
+	go staleConditionsController.Run(1, ctx.Done())
 
 	<-ctx.Done()
 	return fmt.Errorf("stopped")
