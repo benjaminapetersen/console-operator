@@ -1,0 +1,43 @@
+apiVersion: config.openshift.io/v1
+kind: Console
+metadata:
+  name: cluster
+spec:
+  authentication:
+    # we accept a string
+    logoutRedirect: ""
+  # does this belong here instead?
+  # or does it belong on operator config?
+  # or does it belong as a CustomResource?
+  banners:
+  - text: Confidential secret stuff be careful!
+    position: topBottom
+    link:
+      text: link
+      href: https://www.redhat.com
+    backgroundColor: #990000
+    color: #fff
+  - text: This is a banner on top
+      position: top
+      link:
+        text: link
+        href: https://www.redhat.com
+      backgroundColor: #990000
+      color: #fff
+  - text: This is a banner on bottom
+      position: bottom
+      link:
+        text: link
+        href: https://www.redhat.com
+      backgroundColor: #990000
+      color: #fff
+
+status:
+  # we report a string
+  consoleURL: ""
+
+
+
+
+
+

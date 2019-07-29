@@ -1,0 +1,66 @@
+apiVersion: operator.openshift.io/v1
+kind: Console
+metadata:
+  name: cluster
+spec:
+  managementState: Managed
+  authentication:
+    # the logout redirect must be a valid URI that starts with http(s)
+    # valid examples: http://localhost:8080/logout.html, https://www.redhat.com/log/out/
+    logoutRedirect: "https://www.redhat.com/i/should/logout"
+  customization:
+    customProductName: Muh Clusta
+    customLogoFile:
+      # name: fake-logo-that-does-not-exist
+      name: fake-logo
+      # name: my-fake-logo
+      # name: console-config
+      key: fake-logo.png
+      # attempt to blow up the console:
+      # name: console-config
+      # key: fake-logo.png
+
+
+
+
+## steps for me:
+## oc create configmap my-logo-file --from-file ~/Desktop/fake-logo.png -n openshift-config
+## oc get configmap my-logo-file -n openshift-config
+## oc apply -f examples/cr-console.operator.config.customlogo.yaml
+#
+#
+
+
+# NOTES: the api is a little verbose, it would be nice
+# to trim it down into something simpler & help the user figure it out.
+#apiVersion: operator.openshift.io/v1
+#kind: Console
+#metadata:
+#  name: cluster
+#spec:
+#  customization:
+#    customProductName: Muh Clusta
+#    # "File" is rather unnecessary
+#    customLogoFile:
+#      # sadly, namespace is hidden away from this API.  It is "openshift-config" and you
+#      # just have to magically know that:
+#      # namespace: openshift-config # boo.
+#      name: my-logo-file
+#      # What if the file is actually a .jpg, but named .png?  Or if its a .pdf or anything
+#      # else but named .png?  We should be able to read it and check its format via the
+#      # bytes on disk.  Then the user doesn't really need to do this, We can just
+#      # CONST logoName = "logo"
+#      # logo = logoName + fileSuffix(fileBytes) or whatever we use to read the bytes
+#      # It really shouldn't be anything else?
+#      key: fake-logo.png
+#
+## better!
+#apiVersion: operator.openshift.io/v1
+#kind: Console
+#metadata:
+#  name: cluster
+#spec:
+#  customization:
+#    customProductName: Muh Clusta
+#    customLogo:
+#      name: my-logo-file

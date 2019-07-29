@@ -1,0 +1,17 @@
+apiVersion: config.openshift.io/v1
+kind: Console
+metadata:
+  name: cluster
+spec:
+  authentication:
+    # we accept a string
+    logoutRedirect: ""
+status:
+  # we report a string
+  consoleURL: ""
+
+
+
+
+
+

@@ -1,0 +1,121 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  annotations:
+  labels:
+    app: console
+    component: ui
+  name: console
+  namespace: openshift-console
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: console
+      component: ui
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        console.openshift.io/image: docker.io/openshift/origin-console:latest
+      labels:
+        app: console
+        component: ui
+      name: console
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: console
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      containers:
+      - command:
+        - /opt/bridge/bin/bridge
+        - --public-dir=/opt/bridge/static
+        - --config=/var/console-config/console-config.yaml
+        - --service-ca-file=/var/service-ca/service-ca.crt
+        - --log-level=*=NOTICE
+        image: docker.io/openshift/origin-console:latest
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 8443
+            scheme: HTTPS
+          initialDelaySeconds: 150
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: console
+        ports:
+        - containerPort: 443
+          name: https
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 8443
+            scheme: HTTPS
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          requests:
+            cpu: 10m
+            memory: 100Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /var/serving-cert
+          name: console-serving-cert
+          readOnly: true
+        - mountPath: /var/oauth-config
+          name: console-oauth-config
+          readOnly: true
+        - mountPath: /var/console-config
+          name: console-config
+          readOnly: true
+        - mountPath: /var/service-ca
+          name: service-ca
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      priorityClassName: system-cluster-critical
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      volumes:
+      - name: console-serving-cert
+        secret:
+          defaultMode: 420
+          secretName: console-serving-cert
+      - name: console-oauth-config
+        secret:
+          defaultMode: 420
+          secretName: console-oauth-config
+      - configMap:
+          defaultMode: 420
+          name: console-config
+        name: console-config
+      - configMap:
+          defaultMode: 420
+          name: service-ca
+        name: service-ca

@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: console-operator
+  namespace: openshift-console-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: console-operator
+  template:
+    metadata:
+      labels:
+        name: console-operator
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: "NoSchedule"
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 120
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 120
+      priorityClassName: system-cluster-critical
+      serviceAccountName: console-operator
+      containers:
+      - name: console-operator
+        terminationMessagePolicy: FallbackToLogsOnError
+        # for development
+        # once you clone this repo, make changes, build & push a new image:
+        # docker build quay.io/<your-user>/console-operator:latest .
+        # docker push quay.io/<your-user>/console-operator:latest
+        # then
+        # oc apply -f examples/05-operator-alt-image.yaml
+        # with this line updated:
+        image: quay.io/benjaminapetersen/console-operator:latest
+        ports:
+        - containerPort: 60000
+          name: metrics
+        command:
+        - console
+        - operator
+        args:
+        # loglevel 6 will dump requests
+        # traceall means 9 unless mo is being dumb and put it at 100
+        # arbitrary high
+        # 0-2 is bare minimum
+        # 0 is nothing
+        # 1, 3, 5, etc unused
+        # 6 adds metadata
+        # 8 adds lots
+        # 9 is all the things
+        # but if you mean all the things go 100. cuz people are cute
+        # - "-v=100"
+        - "-v=4"
+        # 04-config.yaml provides this config for the operator
+        - "--config=/var/run/configmaps/config/controller-config.yaml"
+        #
+        # pull policy must be Always for development purposes
+        imagePullPolicy: Always
+        volumeMounts:
+        - mountPath: /var/run/configmaps/config
+          name: config
+        env:
+        - name: IMAGE
+          value: quay.io/benjaminapetersen/console:latest
+          # value: docker.io/openshift/origin-console:latest
+        - name: RELEASE_VERSION
+          value: "0.0.1-snapshot"
+        - name: OPERATOR_NAME
+          value: "console-operator"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources:
+          requests:
+            memory: "100Mi"
+            cpu: "10m"
+      volumes:
+      - name: config
+        configMap:
+          name: console-operator-config

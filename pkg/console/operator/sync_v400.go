@@ -146,19 +146,29 @@ func (co *consoleOperator) sync_v400(updatedOperatorConfig *operatorv1.Console, 
 	// - if we have at least one ready replica
 	// - route is admitted
 	// available is currently defined as "met the users intent"
+	var routeAdmittedErr error
+	if !routesub.IsAdmitted(rt) {
+		msg := "console route is not admitted"
+		routeAdmittedErr = errors.New(msg)
+		klog.V(4).Infoln(msg)
+	}
+	co.HandleAvailable(updatedOperatorConfig, "RouteAdmitted", routeAdmittedErr)
+
+	var readyReplicasErr error
 	if !deploymentsub.IsReady(actualDeployment) {
 		msg := fmt.Sprintf("%v pods available for console deployment", actualDeployment.Status.ReadyReplicas)
+		readyReplicasErr = errors.New(msg)
 		klog.V(4).Infoln(msg)
-		co.ConditionDeploymentNotAvailable(updatedOperatorConfig, msg)
-	} else if !routesub.IsAdmitted(rt) {
-		msg := "console route is not admitted"
-		klog.V(4).Infoln(msg)
-		co.HandleAvailable(updatedOperatorConfig, "RouteNotAdmitted", errors.New(msg))
-	} else if actualDeployment.Status.Replicas == actualDeployment.Status.ReadyReplicas && actualDeployment.Status.Replicas == actualDeployment.Status.UpdatedReplicas {
-		co.ConditionDeploymentAvailable(updatedOperatorConfig, fmt.Sprintf("%v replicas ready at version %s", actualDeployment.Status.ReadyReplicas, os.Getenv("RELEASE_VERSION")))
-	} else {
-		co.ConditionDeploymentAvailable(updatedOperatorConfig, fmt.Sprintf("%v replicas ready", actualDeployment.Status.ReadyReplicas))
 	}
+	co.HandleAvailable(updatedOperatorConfig, "ReadyReplicas", readyReplicasErr)
+
+	var readyAndUpdatedErr error
+	if deploymentsub.IsReadyAndUpdated(actualDeployment) {
+		msg := fmt.Sprintf("%v replicas ready at version %s", actualDeployment.Status.ReadyReplicas, os.Getenv("RELEASE_VERSION"))
+		readyAndUpdatedErr = errors.New(msg)
+		klog.V(4).Infoln(msg)
+	}
+	co.HandleAvailable(updatedOperatorConfig, "DeploymentReplicasUpdated", readyAndUpdatedErr)
 
 	// if we survive the gauntlet, we need to update the console config with the
 	// public hostname so that the world can know the console is ready to roll

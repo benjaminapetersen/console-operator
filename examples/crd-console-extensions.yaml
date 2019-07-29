@@ -1,0 +1,70 @@
+apiVersion: console.openshift.io/v1
+kind: ConsoleLink
+metadata:
+  name: example
+spec:
+  href: 'https://www.example.com'
+  location: HelpMenu
+  text: Link 1
+---
+apiVersion: console.openshift.io/v1
+kind: ConsoleLink
+metadata:
+  name: example2
+spec:
+  href: 'https://www.example.com'
+  location: HelpMenu
+  text: Link 2
+---
+apiVersion: console.openshift.io/v1
+kind: ConsoleCLIDownload
+metadata:
+  name: example
+spec:
+  displayName: examplecli
+  description: |
+    This is an example CLI download description that can include markdown such as paragraphs, unordered lists, code, [links](https://www.example.com), etc.
+
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce a lobortis justo, eu suscipit purus.
+  links:
+  - href: 'https://www.example.com'
+    name: worker
+---
+apiVersion: console.openshift.io/v1
+kind: ConsoleCLIDownload
+metadata:
+  name: example2
+spec:
+  displayName: examplecli 2
+  description: |
+     Another example CLI download.
+  links:
+  - href: 'https://www.example.com'
+    name: ninnies
+---
+apiVersion: console.openshift.io/v1
+kind: ConsoleNotification
+metadata:
+  name: example
+spec:
+  text: This is an example notification message with an optional link.
+  location: BannerTop
+  link:
+    href: 'https://www.example.com'
+    text: Optional link text
+  color: '#fff'
+  backgroundColor: '#0088ce'
+---
+apiVersion: console.openshift.io/v1
+kind: ConsoleNotification
+metadata:
+  name: example2
+spec:
+  text: Another notification!
+  location: BannerTop
+  link:
+    href: 'https://www.example.com'
+    text: Optional link
+  color: '#fff'
+  backgroundColor: '#990000'
+

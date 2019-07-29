@@ -81,7 +81,6 @@ func (c *consoleOperator) HandleProgressing(operatorConfig *operatorsv1.Console,
 	handleCondition(operatorConfig, conditionType, prefix, err)
 }
 
-// TODO: HandleAvailable()
 func (c *consoleOperator) HandleAvailable(operatorConfig *operatorsv1.Console, prefix string, err error) {
 	conditionType := prefix + operatorsv1.OperatorStatusTypeAvailable
 	handleCondition(operatorConfig, conditionType, prefix, err)
@@ -160,29 +159,6 @@ func (c *consoleOperator) logConditions(conditions []operatorsv1.OperatorConditi
 		}
 		klog.V(4).Infoln(buf.String())
 	}
-}
-
-func (c *consoleOperator) ConditionDeploymentAvailable(operatorConfig *operatorsv1.Console, message string) *operatorsv1.Console {
-	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
-		Type:               operatorsv1.OperatorStatusTypeAvailable,
-		Status:             operatorsv1.ConditionTrue,
-		Message:            message,
-		LastTransitionTime: metav1.Now(),
-	})
-
-	return operatorConfig
-}
-
-func (c *consoleOperator) ConditionDeploymentNotAvailable(operatorConfig *operatorsv1.Console, message string) *operatorsv1.Console {
-	v1helpers.SetOperatorCondition(&operatorConfig.Status.Conditions, operatorsv1.OperatorCondition{
-		Type:               operatorsv1.OperatorStatusTypeAvailable,
-		Status:             operatorsv1.ConditionFalse,
-		Reason:             reasonNoPodsAvailable,
-		Message:            message,
-		LastTransitionTime: metav1.Now(),
-	})
-
-	return operatorConfig
 }
 
 // When a sync error happens,

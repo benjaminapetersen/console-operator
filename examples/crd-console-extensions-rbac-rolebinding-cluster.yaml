@@ -1,0 +1,14 @@
+# NOTE: WE DONT WANT THIS!
+# ELIMINATE IT ASAP
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: console-extensions-reader
+roleRef:
+  kind: ClusterRole
+  name: console-extensions-reader
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: Group
+    name: system:authenticated
+    apiGroup: rbac.authorization.k8s.io

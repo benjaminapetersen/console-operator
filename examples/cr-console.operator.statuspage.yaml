@@ -1,0 +1,13 @@
+apiVersion: operator.openshift.io/v1
+kind: Console
+metadata:
+  name: cluster
+spec:
+  providers:
+    statuspage:
+      pageID: id-12345678901234567890
+
+
+
+
+
