@@ -58,6 +58,9 @@ func TestMetricsEndpoint(t *testing.T) {
 			return false, err
 		}
 		routeForMetrics = "https://" + tempRoute.Spec.Host + "/metrics"
+		// need port?
+		// tempRoute.Spec.Port.TargetPort not sure this is correct
+		// 8443? hard-coded?
 		t.Logf("route for metrics: %v", routeForMetrics)
 		return true, nil
 	})
@@ -93,6 +96,8 @@ func TestMetricsEndpoint(t *testing.T) {
 
 }
 
+// our metrics endpoint should not have a route, but this makes it
+// easier to access the pod http://localhost:8443/metrics endpoint
 func tempRouteForTesting() *routev1.Route {
 	return &routev1.Route{
 		ObjectMeta: metav1.ObjectMeta{
@@ -116,6 +121,7 @@ func tempRouteForTesting() *routev1.Route {
 	}
 }
 
+// perhaps we need an additional clusterrole...
 func tempClusterRole() rbacv1.ClusterRole {
 	return rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
@@ -133,6 +139,7 @@ func tempClusterRole() rbacv1.ClusterRole {
 	}
 }
 
+// and rolebinding...
 func tempClusterRoleBinding() rbacv1.ClusterRoleBinding {
 	return rbacv1.ClusterRoleBinding{}
 }
