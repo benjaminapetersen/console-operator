@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	rbacv1 "k8s.io/api/rbac/v1"
+	// rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -98,6 +98,8 @@ func TestMetricsEndpoint(t *testing.T) {
 
 // our metrics endpoint should not have a route, but this makes it
 // easier to access the pod http://localhost:8443/metrics endpoint
+// from our test
+//
 func tempRouteForTesting() *routev1.Route {
 	return &routev1.Route{
 		ObjectMeta: metav1.ObjectMeta{
@@ -122,24 +124,24 @@ func tempRouteForTesting() *routev1.Route {
 }
 
 // perhaps we need an additional clusterrole...
-func tempClusterRole() rbacv1.ClusterRole {
-	return rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "console-operator-metrics",
-		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				Verbs: []string{"GET", "LIST", "WATCH"},
-				// APIGroups:       nil,
-				// Resources:       nil,
-				// ResourceNames:   nil,
-				NonResourceURLs: []string{"/metrics"},
-			},
-		},
-	}
-}
-
-// and rolebinding...
-func tempClusterRoleBinding() rbacv1.ClusterRoleBinding {
-	return rbacv1.ClusterRoleBinding{}
-}
+//func tempClusterRole() rbacv1.ClusterRole {
+//	return rbacv1.ClusterRole{
+//		ObjectMeta: metav1.ObjectMeta{
+//			Name: "console-operator-metrics",
+//		},
+//		Rules: []rbacv1.PolicyRule{
+//			{
+//				Verbs: []string{"GET", "LIST", "WATCH"},
+//				// APIGroups:       nil,
+//				// Resources:       nil,
+//				// ResourceNames:   nil,
+//				NonResourceURLs: []string{"/metrics"},
+//			},
+//		},
+//	}
+//}
+//
+//// and rolebinding...
+//func tempClusterRoleBinding() rbacv1.ClusterRoleBinding {
+//	return rbacv1.ClusterRoleBinding{}
+//}
