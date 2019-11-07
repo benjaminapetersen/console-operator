@@ -74,6 +74,8 @@ func findLineInResponse(t *testing.T, haystack, needle string) (found bool) {
 			continue
 		}
 		found := strings.Contains(text, needle)
+		// reveals 403!
+		// metrics_test.go:77: looking for 'console_url' in {"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"forbidden: User \"system:anonymous\" cannot get path \"/metrics\"","reason":"Forbidden","details":{},"code":403}, (false)
 		t.Logf("looking for '%v' in %v, (%v)\n", needle, text, found)
 		if found {
 			t.Logf("found %s\n", scanner.Text())
@@ -90,16 +92,30 @@ func metricsRequest(t *testing.T, routeForMetrics string) string {
 
 	resp, err := insecureClient.Do(req)
 	if err != nil {
-		t.Fatalf("error: %s", err)
+		t.Fatalf("http error: %s", err)
 	}
+
+	// in CI we can get:
+	// metrics_test.go:77: looking for 'console_url' in {"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"forbidden: User \"system:anonymous\" cannot get path \"/metrics\"","reason":"Forbidden","details":{},"code":403}, (false)
+	if !httpOK(resp) {
+		t.Fatalf("http error: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+	}
+
 	defer resp.Body.Close()
 
 	bytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		t.Fatalf("error: %s", err)
+		t.Fatalf("read error: %s", err)
 	}
 
 	return string(bytes)
+}
+
+func httpOK(resp *http.Response) bool {
+	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
+		return true
+	}
+	return false
 }
 
 // a request with a route & the bearer token
