@@ -69,9 +69,14 @@ func TestMetricsEndpoint(t *testing.T) {
 func findLineInResponse(haystack, needle string) (found bool) {
 	scanner := bufio.NewScanner(strings.NewReader(haystack))
 	for scanner.Scan() {
-		found := strings.Contains(scanner.Text(), needle)
+		text := scanner.Text()
+		if strings.HasPrefix(text, "#") {
+			continue
+		}
+		found := strings.Contains(text, needle)
+		fmt.Printf("looking for '%v' in %v, (%v)\n", needle, text, found)
 		if found {
-			fmt.Printf("found %s\n", scanner.Text())
+			fmt.Printf("found*** %s\n", scanner.Text())
 			return true
 		}
 	}
