@@ -60,13 +60,13 @@ func TestMetricsEndpoint(t *testing.T) {
 	respString := metricsRequest(t, metricsURL)
 
 	t.Logf("searching for %s in metrics data...\n", consoleURLMetric)
-	found := findLineInResponse(respString, consoleURLMetric)
+	found := findLineInResponse(t, respString, consoleURLMetric)
 	if !found {
 		t.Fatalf("did not find %s", consoleURLMetric)
 	}
 }
 
-func findLineInResponse(haystack, needle string) (found bool) {
+func findLineInResponse(t *testing.T, haystack, needle string) (found bool) {
 	scanner := bufio.NewScanner(strings.NewReader(haystack))
 	for scanner.Scan() {
 		text := scanner.Text()
@@ -74,9 +74,9 @@ func findLineInResponse(haystack, needle string) (found bool) {
 			continue
 		}
 		found := strings.Contains(text, needle)
-		fmt.Printf("looking for '%v' in %v, (%v)\n", needle, text, found)
+		t.Logf("looking for '%v' in %v, (%v)\n", needle, text, found)
 		if found {
-			fmt.Printf("found*** %s\n", scanner.Text())
+			t.Logf("found %s\n", scanner.Text())
 			return true
 		}
 	}
