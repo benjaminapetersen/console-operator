@@ -3,6 +3,7 @@ package e2e
 import (
 	"bufio"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -74,8 +75,7 @@ func findLineInResponse(t *testing.T, haystack, needle string) (found bool) {
 			continue
 		}
 		found := strings.Contains(text, needle)
-		// reveals 403!
-		// metrics_test.go:77: looking for 'console_url' in {"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"forbidden: User \"system:anonymous\" cannot get path \"/metrics\"","reason":"Forbidden","details":{},"code":403}, (false)
+		// TODO: remove this, just here to ensure we get a good response and can search
 		t.Logf("looking for '%v' in %v, (%v)\n", needle, text, found)
 		if found {
 			t.Logf("found %s\n", scanner.Text())
@@ -86,17 +86,17 @@ func findLineInResponse(t *testing.T, haystack, needle string) (found bool) {
 }
 
 func metricsRequest(t *testing.T, routeForMetrics string) string {
-	bearer := getBearerToken(t)
-	req := getRequest(t, routeForMetrics, bearer)
-	insecureClient := getInsecureClient()
+	// bearer := getBearerToken(t)
+	// req := getRequestWithToken(t, routeForMetrics, bearer)
+	// httpClient := getInsecureClient()
+	req := getRequest(t, routeForMetrics)
+	httpClient := getClientWithCertAuth(t)
 
-	resp, err := insecureClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		t.Fatalf("http error: %s", err)
 	}
 
-	// in CI we can get:
-	// metrics_test.go:77: looking for 'console_url' in {"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"forbidden: User \"system:anonymous\" cannot get path \"/metrics\"","reason":"Forbidden","details":{},"code":403}, (false)
 	if !httpOK(resp) {
 		t.Fatalf("http error: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
 	}
@@ -118,14 +118,67 @@ func httpOK(resp *http.Response) bool {
 	return false
 }
 
-// a request with a route & the bearer token
-func getRequest(t *testing.T, metricsURL, bearer string) *http.Request {
+func getRequest(t *testing.T, metricsURL string) *http.Request {
 	req, err := http.NewRequest("GET", metricsURL, nil)
 	if err != nil {
-
+		fmt.Printf("%s\n", err)
 	}
+	return req
+}
+
+// a request with a route & the bearer token
+// this only works if test are run as a token user (example: kube:admin)
+func getRequestWithToken(t *testing.T, metricsURL, bearer string) *http.Request {
+	req := getRequest(t, metricsURL)
 	req.Header.Add("Authorization", bearer)
 	return req
+}
+
+// kubeadmin is not a real accout, this test will fail. instead:
+// oc login -u system:admin
+// so that the config read gives correct data back.
+// this only works if test are run as a cert based user (example: system:admin)
+func getClientWithCertAuth(t *testing.T) *http.Client {
+	config, err := framework.GetConfig()
+	if err != nil {
+		t.Fatalf("error, can't get kube config: %s", err)
+	}
+
+	// load from memory, not file
+	tlsCert, err := tls.X509KeyPair(config.CertData, config.KeyData)
+	// load from file, not memory
+	// tlsCert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
+
+	if err != nil {
+		t.Fatalf("error, cannot get key pair, are you logged in as system:admin? %s", err)
+	}
+
+	rootCAs, err := x509.SystemCertPool()
+	if rootCAs == nil {
+		rootCAs = x509.NewCertPool()
+	}
+
+	if err != nil {
+		// not sure if we should panic/die here
+		fmt.Printf("x509 certs err: %v", err)
+	}
+
+	// need to add the CAData, the kubeconfig has router certs
+	// that are missing from the system trust roots
+	rootCAs.AppendCertsFromPEM(config.CAData)
+
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				Certificates: []tls.Certificate{tlsCert},
+				RootCAs:      rootCAs,
+				// x509 error, certificate is valid for service, not route, so must
+				// use an insecure client. This is not really ideal after going through
+				// the trouble of wiring up the certs :/
+				InsecureSkipVerify: true,
+			},
+		},
+	}
 }
 
 func getInsecureClient() *http.Client {
@@ -145,6 +198,10 @@ func getBearerToken(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("error, can't get config: %s", err)
 	}
+
+	// use this for
+	// tokenProvider.TLSClientConfig
+
 	// build the request header with a token from the kubeconfig
 	return fmt.Sprintf("Bearer %s", tokenProvider.BearerToken)
 }
@@ -189,7 +246,9 @@ func tempRouteForTesting() *routev1.Route {
 				TargetPort: intstr.FromString("https"),
 			},
 			TLS: &routev1.TLSConfig{
-				Termination:                   routev1.TLSTerminationReencrypt,
+				// Termination:                   routev1.TLSTerminationReencrypt,
+				// NOTE: has to be passthrough for cert auth?
+				Termination:                   routev1.TLSTerminationPassthrough,
 				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 			},
 			WildcardPolicy: routev1.WildcardPolicyNone,
