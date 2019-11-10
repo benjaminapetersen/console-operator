@@ -77,6 +77,7 @@ func DeleteAll(t *testing.T, client *ClientSet) {
 func GetResource(client *ClientSet, resource TestingResource) (runtime.Object, error) {
 	var res runtime.Object
 	var err error
+
 	switch resource.kind {
 	case "ConfigMap":
 		res, err = client.Core.ConfigMaps(resource.namespace).Get(resource.name, metav1.GetOptions{})
@@ -91,6 +92,11 @@ func GetResource(client *ClientSet, resource TestingResource) (runtime.Object, e
 	default:
 		err = fmt.Errorf("error getting resource: resource %s not identified", resource.kind)
 	}
+
+	if errors.IsNotFound(err) {
+		fmt.Printf("GetResource: %v, %v, %v (not found:%v)\n", resource.kind, resource.name, resource.namespace, errors.IsNotFound(err))
+	}
+
 	return res, err
 }
 
@@ -221,6 +227,7 @@ func ConsoleResourcesUnavailable(client *ClientSet) error {
 
 	errChan := make(chan error)
 	for _, resource := range resources {
+		fmt.Printf("removing....%v\n", resource)
 		go IsResourceUnavailable(errChan, client, resource)
 	}
 	checkErr := <-errChan
@@ -234,6 +241,7 @@ func IsResourceUnavailable(errChan chan error, client *ClientSet, resource Testi
 	counter := 0
 	maxCount := 15
 	err := wait.Poll(1*time.Second, AsyncOperationTimeout, func() (stop bool, err error) {
+
 		obtainedResource, err := GetResource(client, resource)
 		if err == nil {
 			return true, fmt.Errorf("deleted console %s %s was recreated: %#v", resource.kind, resource.name, obtainedResource)
