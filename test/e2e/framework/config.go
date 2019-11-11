@@ -32,19 +32,16 @@ import (
 func GetConfig() (*rest.Config, error) {
 	// If an env variable is specified with the config location, use that
 	if len(os.Getenv("KUBECONFIG")) > 0 {
-		fmt.Printf("using env KUBECONFIG: %v\n", os.Getenv("KUBECONFIG"))
 		return clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
 	}
 	// If no explicit location, try the in-cluster config
 	if c, err := rest.InClusterConfig(); err == nil {
-		fmt.Printf("using InClusterConfig(): %v\n", c)
 		return c, nil
 	}
 	// If no in-cluster config, try the default location in the user's home directory
 	if usr, err := user.Current(); err == nil {
 		if c, err := clientcmd.BuildConfigFromFlags(
 			"", filepath.Join(usr.HomeDir, ".kube", "config")); err == nil {
-			fmt.Printf("using $HOME/.kube/config: %v\n", c)
 			return c, nil
 		}
 	}
@@ -52,7 +49,8 @@ func GetConfig() (*rest.Config, error) {
 	return nil, fmt.Errorf("could not locate a kubeconfig")
 }
 
-// authn operator does this a bit differently.
+// authn operator approach to getting config.
+// choose func as needed.
 // https://github.com/openshift/cluster-authentication-operator/blob/master/test/library/client.go
 // NewClientConfigForTest returns a config configured to connect to the api server
 func NewClientConfigForTest() (*rest.Config, error) {

@@ -71,12 +71,11 @@ func findLineInResponse(t *testing.T, haystack, needle string) (found bool) {
 	scanner := bufio.NewScanner(strings.NewReader(haystack))
 	for scanner.Scan() {
 		text := scanner.Text()
+		// skip comments
 		if strings.HasPrefix(text, "#") {
 			continue
 		}
 		found := strings.Contains(text, needle)
-		// TODO: remove this, just here to ensure we get a good response and can search
-		t.Logf("looking for '%v' in %v, (%v)\n", needle, text, found)
 		if found {
 			t.Logf("found %s\n", scanner.Text())
 			return true
@@ -86,9 +85,6 @@ func findLineInResponse(t *testing.T, haystack, needle string) (found bool) {
 }
 
 func metricsRequest(t *testing.T, routeForMetrics string) string {
-	// bearer := getBearerToken(t)
-	// req := getRequestWithToken(t, routeForMetrics, bearer)
-	// httpClient := getInsecureClient()
 	req := getRequest(t, routeForMetrics)
 	httpClient := getClientWithCertAuth(t)
 
@@ -126,15 +122,7 @@ func getRequest(t *testing.T, metricsURL string) *http.Request {
 	return req
 }
 
-// a request with a route & the bearer token
-// this only works if test are run as a token user (example: kube:admin)
-func getRequestWithToken(t *testing.T, metricsURL, bearer string) *http.Request {
-	req := getRequest(t, metricsURL)
-	req.Header.Add("Authorization", bearer)
-	return req
-}
-
-// kubeadmin is not a real accout, this test will fail. instead:
+// kubeadmin is an oauth account. it will not work. to run tests instead do:
 // oc login -u system:admin
 // so that the config read gives correct data back.
 // this only works if test are run as a cert based user (example: system:admin)
@@ -150,7 +138,7 @@ func getClientWithCertAuth(t *testing.T) *http.Client {
 	// tlsCert, err := tls.LoadX509KeyPair(config.CertFile, config.KeyFile)
 
 	if err != nil {
-		t.Fatalf("error, cannot get key pair, are you logged in as system:admin? %s", err)
+		t.Fatalf("error, cannot get key pair, are you logged in as system:admin (kube:admin will not work)? %s", err)
 	}
 
 	rootCAs, err := x509.SystemCertPool()
@@ -181,32 +169,7 @@ func getClientWithCertAuth(t *testing.T) *http.Client {
 	}
 }
 
-func getInsecureClient() *http.Client {
-	// ignore self signed certs for testing purposes
-	return &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-}
-
-// gets us a token from the kubeconfig file
-func getBearerToken(t *testing.T) string {
-	tokenProvider, err := framework.GetConfig()
-	if err != nil {
-		t.Fatalf("error, can't get config: %s", err)
-	}
-
-	// use this for
-	// tokenProvider.TLSClientConfig
-
-	// build the request header with a token from the kubeconfig
-	return fmt.Sprintf("Bearer %s", tokenProvider.BearerToken)
-}
-
-// polls for the metrics route host, and returns just a formatted url for https://<host>/metrics
+// polls for the metrics route host, and returns https://<host>/metrics
 func getMetricsURL(t *testing.T, client *framework.ClientSet) string {
 	tempRoute := tempRouteForTesting()
 	routeForMetrics := ""
@@ -229,8 +192,7 @@ func getMetricsURL(t *testing.T, client *framework.ClientSet) string {
 	return routeForMetrics
 }
 
-// In production our metrics endpoint should not have a route, but this makes it
-// easier to access the pod http://localhost:8443/metrics endpoint to verify its output
+// in production the operator does not have a route.
 func tempRouteForTesting() *routev1.Route {
 	return &routev1.Route{
 		ObjectMeta: metav1.ObjectMeta{

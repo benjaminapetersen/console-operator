@@ -92,11 +92,6 @@ func GetResource(client *ClientSet, resource TestingResource) (runtime.Object, e
 	default:
 		err = fmt.Errorf("error getting resource: resource %s not identified", resource.kind)
 	}
-
-	if errors.IsNotFound(err) {
-		fmt.Printf("GetResource: %v, %v, %v (not found:%v)\n", resource.kind, resource.name, resource.namespace, errors.IsNotFound(err))
-	}
-
 	return res, err
 }
 
@@ -227,7 +222,6 @@ func ConsoleResourcesUnavailable(client *ClientSet) error {
 
 	errChan := make(chan error)
 	for _, resource := range resources {
-		fmt.Printf("removing....%v\n", resource)
 		go IsResourceUnavailable(errChan, client, resource)
 	}
 	checkErr := <-errChan
