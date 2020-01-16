@@ -283,7 +283,7 @@ func consoleContainer(cr *operatorv1.Console, volConfigList []volumeConfig, prox
 
 	return corev1.Container{
 		Image:           util.GetImageEnv(),
-		ImagePullPolicy: corev1.PullPolicy("IfNotPresent"),
+		ImagePullPolicy: corev1.PullPolicy("Always"),
 		Name:            api.OpenShiftConsoleName,
 		Command:         flags,
 		// TODO: can probably remove, this is used for local dev
